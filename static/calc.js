@@ -53,7 +53,7 @@
     if (item.group === 'alcohol') {
       const a = R.alcohol[item.alcohol]; taxable = priceK + shipK;
       const duty = (under || ftaOk) ? 0 : taxable * a.duty, liquor = (taxable + duty) * a.liquor, edu = liquor * a.edu, vat = under ? 0 : (taxable + duty + liquor + edu) * R.vat;
-      lines = [['관세', duty], ['주세', liquor], ['교육세', edu], ['부가세', vat]]; method = under ? 'alcohol_partial' : 'alcohol'; exempt = false; partial = under;
+      lines = [[`관세<span class="pill">${(under||ftaOk) ? '면제' : Math.round(a.duty*100)+'%'}</span>`, duty], [`주세<span class="pill">${Math.round(a.liquor*100)}%</span>`, liquor], [`교육세<span class="pill">주세의 ${Math.round(a.edu*100)}%</span>`, edu], [`부가세<span class="pill">${under ? '면제' : '10%'}</span>`, vat]]; method = under ? 'alcohol_partial' : 'alcohol'; exempt = false; partial = under;
     } else if (under) { method = 'exempt'; }
     else if (item.group === 'tobacco') { method = 'unsupported'; }
     else {
@@ -62,14 +62,14 @@
       if (useSimp) {
         const lux = Object.entries(R.luxury).filter(([k]) => !k.startsWith('_')).map(([, v]) => v).find(v => v.items.includes(item.slug));
         if (lux && taxable > lux.threshold_krw) { lines = [['간이세율 (개별소비세 대상 고가품)', lux.base_krw + (taxable - lux.threshold_krw) * lux.over_rate]]; method = 'simplified_luxury'; }
-        else { const rate = R.simplified_rates[item.group]; lines = [[`간이세율 ${Math.round(rate * 100)}% (관세·부가세 통합)`, taxable * rate]]; method = 'simplified'; }
+        else { const rate = R.simplified_rates[item.group]; lines = [[`간이세율<span class="pill">${Math.round(rate * 100)}% 통합</span>`, taxable * rate]]; method = 'simplified'; }
       } else {
         const duty = (ftaOk || item.duty === 0) ? 0 : taxable * item.duty;
         const vatRate = (R.vat_exempt_items || []).includes(item.slug) ? 0 : R.vat;
-        lines = [[`관세 ${ftaOk ? '0% (FTA)' : Math.round(item.duty * 1000) / 10 + '%'}`, duty]];
+        lines = [[`관세<span class="pill">${ftaOk ? 'FTA 0%' : Math.round(item.duty * 1000) / 10 + '%'}</span>`, duty]];
         let excise = 0, edu = 0; const thr = ict.thresholds_krw[item.slug];
-        if (thr && taxable + duty > thr) { excise = (taxable + duty - thr) * ict.rate; edu = excise * ict.edu; lines.push(['개별소비세 (기준 초과분 20%)', excise], ['교육세', edu]); }
-        lines.push([`부가세 ${Math.round(vatRate * 100)}%`, (taxable + duty + excise + edu) * vatRate]); method = 'general';
+        if (thr && taxable + duty > thr) { excise = (taxable + duty - thr) * ict.rate; edu = excise * ict.edu; lines.push(['개별소비세<span class="pill">초과분 20%</span>', excise], ['교육세<span class="pill">개소세의 30%</span>', edu]); }
+        lines.push([`부가세<span class="pill">${Math.round(vatRate * 100)}%</span>`, (taxable + duty + excise + edu) * vatRate]); method = 'general';
       }
     }
     const tax = lines.reduce((s, [, v]) => s + v, 0);

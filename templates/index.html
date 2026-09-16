@@ -49,7 +49,7 @@
 <section class="grid2">
   <div class="sec">
     <div class="sec-h"><h2>품목별로 보기</h2><a href="{{ base }}items/">전체 {{ items|length }}개</a></div>
-    <ul class="list">{% for it in items[:8] %}<li><a href="{{ base }}items/{{ it.slug }}/">{{ it.name }}<span class="meta">{% if it.group == 'alcohol' %}주류 세금{% elif it.group == 'tobacco' %}별도{% elif it.duty == 0 %}부가세만{% else %}관세 {{ it.duty|pct }}{% endif %}</span></a></li>{% endfor %}</ul>
+    <ul class="list">{% for it in items[:8] %}<li><a href="{{ base }}items/{{ it.slug }}/">{{ it.name }}<span class="meta">{% if it.group == 'alcohol' %}주세·교육세 별도{% elif it.group == 'tobacco' %}담배 세목{% elif it.duty == 0 %}관세 0%{% else %}관세 {{ it.duty|pct }}{% endif %}</span></a></li>{% endfor %}</ul>
   </div>
   <div class="sec">
     <div class="sec-h"><h2>나라별로 보기</h2><a href="{{ base }}guide/fx/">이번 주 환율</a></div>
