@@ -121,5 +121,6 @@
   ['price', 'ship', 'fwd'].forEach(id => $(id).addEventListener('input', render));
   $('fta').addEventListener('change', render); $('simp').addEventListener('change', render);
   if (params.get('price')) $('price').value = params.get('price');
+  window.addEventListener('pageshow', render);
   render();
 })();
