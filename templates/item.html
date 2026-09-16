@@ -20,13 +20,12 @@
 <p class="muted small">이번 주 과세환율 1달러 = {{ fx.rates.USD|int }}원, 해외 배송비 $25 가정. 배대지 요금은 별도.</p>
 {% set country = us %}{% for e in ex %}{% include "_result.html" %}{% endfor %}
 
-<h2>다른 나라에서 살 때</h2>
-<ul class="best">{% for c in countries %}<li><a href="{{ base }}items/{{ item.slug }}/from/{{ c.slug }}/">{{ c.name }}에서 {{ item.name }} 직구</a> <span class="muted">{{ c.currency }} · {% if c.fta %}{{ c.fta_name }}{% else %}FTA 없음{% endif %}</span></li>{% endfor %}</ul>
+<div class="sec"><div class="sec-h"><h2>다른 나라에서 살 때</h2></div>
+<ul class="list">{% for c in countries %}<li><a href="{{ base }}items/{{ item.slug }}/from/{{ c.slug }}/">{{ c.name }}에서 {{ item.name }}<span class="meta">{{ c.currency }} · {% if c.fta %}FTA{% else %}FTA 없음{% endif %}</span></a></li>{% endfor %}</ul></div>
 
-<h2>직접 계산하기</h2>
-<p class="prose"><a class="next" href="{{ base }}?item={{ item.slug }}">{{ item.name }} 가격 넣고 계산</a></p>
+<p class="sheet-actions"><a class="next" href="{{ base }}?item={{ item.slug }}">{{ item.name }} 가격 넣고 계산하기</a></p>
 
 <div class="ad-slot"><!-- ad: item_mid --></div>
-<h2>함께 보는 품목</h2>
-<ul class="cols">{% for o in items if o.group == item.group and o.slug != item.slug %}<li><a href="{{ base }}items/{{ o.slug }}/">{{ o.name }}</a></li>{% endfor %}</ul>
+<div class="sec"><div class="sec-h"><h2>함께 보는 품목</h2><a href="{{ base }}items/">전체</a></div>
+<ul class="list">{% for o in items if o.group == item.group and o.slug != item.slug %}{% if loop.index <= 6 %}<li><a href="{{ base }}items/{{ o.slug }}/">{{ o.name }}<span class="meta">{% if o.group == 'alcohol' %}주류 세금{% elif o.duty == 0 %}부가세만{% else %}관세 {{ o.duty|pct }}{% endif %}</span></a></li>{% endif %}{% endfor %}</ul></div>
 {% endblock %}

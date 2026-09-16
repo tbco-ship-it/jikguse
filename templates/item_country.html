@@ -16,14 +16,16 @@
 <p class="muted small">과세환율 1 {{ country.currency }} = {{ fx.rates[country.currency] }}원 ({{ fx.applies_from }}~{{ fx.applies_to }}), 해외 배송비 약 $25 가정. 배대지 요금 별도.</p>
 {% for e in ex %}{% include "_result.html" %}{% endfor %}
 
-<p class="prose"><a class="next" href="{{ base }}?item={{ item.slug }}&from={{ country.slug }}">내 가격으로 계산하기</a></p>
+<p class="sheet-actions"><a class="next" href="{{ base }}?item={{ item.slug }}&from={{ country.slug }}">내 가격으로 계산하기</a></p>
 
 <h2>{{ country.name }} 직구에서 자주 쓰는 쇼핑몰</h2>
 <p class="prose">{{ country.shops|join(', ') }}. 판매자마다 발송 방식(특송/우편)이 달라 한도가 바뀔 수 있습니다.</p>
 
 <div class="ad-slot"><!-- ad: pair_mid --></div>
-<h2>같은 나라, 다른 품목</h2>
-<ul class="cols">{% for o in items if o.slug != item.slug %}{% if loop.index <= 12 %}<li><a href="{{ base }}items/{{ o.slug }}/from/{{ country.slug }}/">{{ country.name }}에서 {{ o.name }}</a></li>{% endif %}{% endfor %}</ul>
-<h2>같은 품목, 다른 나라</h2>
-<ul class="cols">{% for c in countries if c.slug != country.slug %}<li><a href="{{ base }}items/{{ item.slug }}/from/{{ c.slug }}/">{{ c.name }}에서 {{ item.name }}</a></li>{% endfor %}</ul>
+<section class="grid2">
+<div class="sec"><div class="sec-h"><h2>{{ country.name }}에서 다른 품목</h2><a href="{{ base }}from/{{ country.slug }}/">전체</a></div>
+<ul class="list">{% for o in items if o.slug != item.slug %}{% if loop.index <= 7 %}<li><a href="{{ base }}items/{{ o.slug }}/from/{{ country.slug }}/">{{ o.name }}<span class="meta">{% if o.group == 'alcohol' %}주류 세금{% elif o.duty == 0 %}부가세만{% else %}관세 {{ o.duty|pct }}{% endif %}</span></a></li>{% endif %}{% endfor %}</ul></div>
+<div class="sec"><div class="sec-h"><h2>{{ item.name }}, 다른 나라</h2><a href="{{ base }}items/{{ item.slug }}/">전체</a></div>
+<ul class="list">{% for c in countries if c.slug != country.slug %}<li><a href="{{ base }}items/{{ item.slug }}/from/{{ c.slug }}/">{{ c.name }}<span class="meta">{{ c.currency }}</span></a></li>{% endfor %}</ul></div>
+</section>
 {% endblock %}

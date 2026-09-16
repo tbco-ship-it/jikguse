@@ -44,15 +44,13 @@
 <div class="ad-slot"><!-- ad: home_below --></div>
 
 <section class="grid2">
-  <div>
-    <h2>품목별로 보기</h2>
-    <ul class="cols">{% for it in items[:16] %}<li><a href="{{ base }}items/{{ it.slug }}/">{{ it.name }}</a></li>{% endfor %}</ul>
-    <p><a href="{{ base }}items/">전체 {{ items|length }}개 품목</a></p>
+  <div class="sec">
+    <div class="sec-h"><h2>품목별로 보기</h2><a href="{{ base }}items/">전체 {{ items|length }}개</a></div>
+    <ul class="list">{% for it in items[:8] %}<li><a href="{{ base }}items/{{ it.slug }}/">{{ it.name }}<span class="meta">{% if it.group == 'alcohol' %}주류 세금{% elif it.group == 'tobacco' %}별도{% elif it.duty == 0 %}부가세만{% else %}관세 {{ it.duty|pct }}{% endif %}</span></a></li>{% endfor %}</ul>
   </div>
-  <div>
-    <h2>나라별로 보기</h2>
-    <ul class="cols">{% for c in countries %}<li><a href="{{ base }}from/{{ c.slug }}/">{{ c.name }} 직구 관세</a></li>{% endfor %}</ul>
-    <p><a href="{{ base }}guide/fx/">이번 주 과세환율 표</a></p>
+  <div class="sec">
+    <div class="sec-h"><h2>나라별로 보기</h2><a href="{{ base }}guide/fx/">이번 주 환율</a></div>
+    <ul class="list">{% for c in countries %}<li><a href="{{ base }}from/{{ c.slug }}/">{{ c.name }}<span class="meta">{{ c.currency }} · {{ '한도 $200' if c.courier200 else '한도 $150' }}</span></a></li>{% endfor %}</ul>
   </div>
 </section>
 
