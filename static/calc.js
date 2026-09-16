@@ -76,6 +76,16 @@
     return { exempt, partial, limit, usd, priceK, shipK, taxable, lines, tax, total: priceK + shipK + tax + fwd, method, ftaOk: ftaOk && !under, eff: (priceK + shipK) ? tax / (priceK + shipK) * 100 : 0 };
   }
 
+
+  // Count-up on the headline number (skipped when the user prefers reduced motion).
+  function countUp(el) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const target = parseFloat(el.textContent.replace(/[^0-9.]/g, '')); if (!isFinite(target)) return;
+    const fmt = el.textContent.includes(',') ? n => Math.round(n).toLocaleString('ko-KR') : n => String(Math.round(n));
+    const t0 = performance.now(), dur = 420;
+    (function step(t) { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(target * e); if (k < 1) requestAnimationFrame(step); })(t0);
+  }
+
   function render() {
     const item = picked.items, country = picked.countries;
     if (!item || !country) return;
@@ -103,6 +113,7 @@
     }
     const actions = `<p class="sheet-actions"><a class="next" href="${base}items/${item.slug}/from/${country.slug}/">${country.name}에서 ${item.name} 직구 가이드</a><a class="next" href="https://www.coupang.com/np/search?q=${encodeURIComponent(item.name)}" rel="nofollow noopener" target="_blank">쿠팡 국내가와 비교</a></p>`;
     out.innerHTML = `<section class="sheet ${cls}"><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>해외 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지·국내 배송</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
+    document.querySelectorAll('.sheet-num .num').forEach(countUp);
   }
 
   picker($('country'), D.countries, c => c.name, c => [c.name, c.currency, ...(c.shops || [])], 'us', () => { render(); });
