@@ -10,7 +10,9 @@
   <p>품목과 가격을 넣으면 면세 여부부터 세금, 최종 비용까지 한 번에 나옵니다. 환율은 이번 주 관세청 과세환율({{ fx.rates.USD|int }}원/달러)을 씁니다.</p>
 </section>
 
-<section class="calc card" id="calc">
+<section class="calc-grid">
+<div class="calc card" id="calc">
+  <h2 class="card-title">구매 정보를 알려주세요</h2>
   <div class="row">
     <label class="field">어디서 사나요
       <input id="country" class="pick" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" autocomplete="off" placeholder="미국, 일본, 알리…" data-kind="countries"><ul class="menu" id="country-menu" role="listbox" hidden></ul>
@@ -20,25 +22,26 @@
     </label>
   </div>
   <div class="row">
-    <label class="field"><span>물품 가격 <span class="unit" id="cur1"></span></span>
-      <input id="price" class="num-in" type="text" inputmode="decimal" placeholder="예: 180">
+    <label class="field">물품 가격
+      <span class="money"><span class="unit" id="cur1">USD</span><input id="price" class="num-in" type="text" inputmode="decimal" placeholder="300"></span>
     </label>
-    <label class="field"><span>해외 배송비 <span class="unit" id="cur2"></span></span>
-      <input id="ship" class="num-in" type="text" inputmode="decimal" placeholder="없으면 0">
+    <label class="field">해외 배송비
+      <span class="money"><span class="unit" id="cur2">USD</span><input id="ship" class="num-in" type="text" inputmode="decimal" placeholder="0"></span>
     </label>
   </div>
   <details class="more">
-    <summary>배대지 요금, FTA 원산지</summary>
+    <summary>추가 옵션 · 배대지 요금, FTA 원산지, 간이세율</summary>
     <div class="row">
-      <label class="field">배대지·국내 배송비 (원)<input id="fwd" class="num-in" type="text" inputmode="numeric" placeholder="예: 18000"></label>
-      <label class="check"><input id="fta" type="checkbox"> <span>원산지가 협정국(Made in USA·EU 등)이라 FTA 적용</span></label>
+      <label class="field">배대지·국내 배송비<span class="money"><span class="unit">KRW</span><input id="fwd" class="num-in" type="text" inputmode="numeric" placeholder="18000"></span></label>
+      <label class="check"><input id="fta" type="checkbox"> <span>원산지가 협정국(Made in USA·EU 등) — FTA 적용</span></label>
     </div>
     <div class="row">
       <label class="check"><input id="simp" type="checkbox"> <span>간이통관으로 처리될 때의 간이세율(의류·신발 18%, 기타 15%)로 보기</span></label>
     </div>
   </details>
-  <div id="result" class="result" aria-live="polite"></div>
   <p class="muted small">예상치입니다. 세관 심사와 배대지 실제 요금으로 달라질 수 있어요. <a href="{{ base }}methodology/">계산 방법 보기</a></p>
+</div>
+<div id="result" class="result" aria-live="polite"></div>
 </section>
 
 <div class="ad-slot"><!-- ad: home_below --></div>
@@ -50,7 +53,7 @@
   </div>
   <div class="sec">
     <div class="sec-h"><h2>나라별로 보기</h2><a href="{{ base }}guide/fx/">이번 주 환율</a></div>
-    <ul class="list">{% for c in countries %}<li><a href="{{ base }}from/{{ c.slug }}/">{{ c.name }}<span class="meta">{{ c.currency }} · {{ '한도 $200' if c.courier200 else '한도 $150' }}</span></a></li>{% endfor %}</ul>
+    <ul class="list">{% for c in countries %}<li><a href="{{ base }}from/{{ c.slug }}/">{{ c.name }} <small>{{ c.currency }}</small><span class="meta">{{ '한도 $200' if c.courier200 else '한도 $150' }}</span></a></li>{% endfor %}</ul>
   </div>
 </section>
 
