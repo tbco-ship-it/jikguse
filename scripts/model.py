@@ -31,38 +31,29 @@ def compute(item, country, price, shipping, fx, *, method=None, fta=False, couri
     clearance = "일반통관" if excluded else "목록통관"
     exempt = price_usd <= limit
     fta_ok = fta and country["fta"] and item["group"] != "tobacco"
+    ict = RULES["consumption_tax"]
 
     lines = []
     taxable = 0.0
-    if not exempt:
+    method_used = "exempt"
+    if item["group"] == "alcohol":
+        # 관세청 조회기: "주류는 150달러 이하 면세이면 관세, 부가세만 면세이고, 주세, 교육세는 부과"
+        a = RULES["alcohol"][item["alcohol"]]
         taxable = price_krw + ship_krw
-        if item["group"] == "alcohol":
-            a = RULES["alcohol"][item["alcohol"]]
-            duty = 0.0 if fta_ok else taxable * a["duty"]
-            liquor = (taxable + duty) * a["liquor"]
-            edu = liquor * a["edu"]
-            vat = (taxable + duty + liquor + edu) * RULES["vat"]
-            lines = [("관세", duty, a["duty"]), ("주세", liquor, a["liquor"]), ("교육세", edu, a["edu"]), ("부가세", vat, RULES["vat"])]
-            method_used = "alcohol"
-        elif item["group"] == "tobacco":
-            lines = []
-            method_used = "unsupported"
-        elif item["duty"] == 0 or fta_ok or method == "general" or price_usd > RULES["simplified_cap_usd"]:
-            # 제96조②: 무세·감면(FTA) 물품과 고가품은 간이세율 미적용 → 일반세율
-            duty = 0.0 if (fta_ok or item["duty"] == 0) else taxable * item["duty"]
-            vat_rate = 0.0 if item["slug"] in RULES.get("vat_exempt_items", []) else RULES["vat"]
-            lines = [("관세", duty, 0.0 if fta_ok else item["duty"])]
-            ict = RULES.get("consumption_tax", {})
-            lux_items = [x for k, v in RULES["luxury"].items() if not k.startswith("_") for x in v["items"]]
-            excise = edu = 0.0
-            if item["slug"] in lux_items and (taxable + duty) > ict.get("threshold_krw", 2_000_000):
-                excise = (taxable + duty - ict["threshold_krw"]) * ict["rate"]
-                edu = excise * ict["edu"]
-                lines += [("개별소비세 (기준 초과분)", excise, ict["rate"]), ("교육세", edu, ict["edu"])]
-            vat = (taxable + duty + excise + edu) * vat_rate
-            lines.append(("부가세", vat, vat_rate))
-            method_used = "general"
-        else:
+        duty = 0.0 if (exempt or fta_ok) else taxable * a["duty"]
+        liquor = (taxable + duty) * a["liquor"]
+        edu = liquor * a["edu"]
+        vat = 0.0 if exempt else (taxable + duty + liquor + edu) * RULES["vat"]
+        lines = [("관세", duty, 0.0 if (exempt or fta_ok) else a["duty"]), ("주세", liquor, a["liquor"]), ("교육세", edu, a["edu"]), ("부가세", vat, 0.0 if exempt else RULES["vat"])]
+        method_used = "alcohol_exempt_partial" if exempt else "alcohol"
+    elif exempt:
+        method_used = "exempt"
+    elif item["group"] == "tobacco":
+        method_used = "unsupported"
+    else:
+        taxable = price_krw + ship_krw
+        use_simplified = (method == "simplified" and item["duty"] > 0 and not fta_ok and taxable <= RULES["simplified_cap_krw"])
+        if use_simplified:
             lux = next((v for k, v in RULES["luxury"].items() if not k.startswith("_") and item["slug"] in v["items"]), None)
             if lux and taxable > lux["threshold_krw"]:
                 tax = lux["base_krw"] + (taxable - lux["threshold_krw"]) * lux["over_rate"]
@@ -72,14 +63,26 @@ def compute(item, country, price, shipping, fx, *, method=None, fta=False, couri
                 rate = RULES["simplified_rates"][item["group"]]
                 lines = [("간이세율 (관세·부가세 통합)", taxable * rate, rate)]
                 method_used = "simplified"
-    else:
-        method_used = "exempt"
+        else:
+            duty = 0.0 if (fta_ok or item["duty"] == 0) else taxable * item["duty"]
+            vat_rate = 0.0 if item["slug"] in RULES.get("vat_exempt_items", []) else RULES["vat"]
+            lines = [("관세", duty, 0.0 if fta_ok else item["duty"])]
+            excise = edu = 0.0
+            thr = ict["thresholds_krw"].get(item["slug"])
+            if thr and (taxable + duty) > thr:
+                excise = (taxable + duty - thr) * ict["rate"]
+                edu = excise * ict["edu"]
+                lines += [("개별소비세 (기준 초과분)", excise, ict["rate"]), ("교육세", edu, ict["edu"])]
+            vat = (taxable + duty + excise + edu) * vat_rate
+            lines.append(("부가세", vat, vat_rate))
+            method_used = "general"
 
     tax_total = sum(v for _, v, _ in lines)
     total = price_krw + ship_krw + tax_total + forwarder_krw
     return {
         "clearance": clearance,
-        "exempt": exempt,
+        "exempt": exempt and item["group"] != "alcohol",
+        "partial_exempt": exempt and item["group"] == "alcohol",
         "limit_usd": limit,
         "price_usd": round(price_usd, 2),
         "price_krw": round(price_krw),

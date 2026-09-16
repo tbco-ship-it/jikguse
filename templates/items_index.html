@@ -3,5 +3,5 @@
 {% block content %}
 <h1>품목별 직구 관세</h1>
 <table class="tbl"><thead><tr><th>품목</th><th>목록통관</th><th>관세율</th><th>과세 시 실제 적용</th></tr></thead>
-<tbody>{% for it in items %}<tr><td><a href="{{ base }}items/{{ it.slug }}/">{{ it.name }}</a></td><td>{{ '불가' if it.excluded else '가능' }}</td><td>{{ it.duty|pct }}</td><td>{% if it.group == 'alcohol' %}주세·교육세·부가세 추가{% elif it.group == 'tobacco' %}담배 세목 별도{% elif it.duty == 0 %}부가세 10%만{% else %}간이세율 {{ rules.simplified_rates[it.group]|pct }}{% endif %}</td></tr>{% endfor %}</tbody></table>
+<tbody>{% for it in items %}<tr><td><a href="{{ base }}items/{{ it.slug }}/">{{ it.name }}</a></td><td>{{ '불가' if it.excluded else '가능' }}</td><td>{{ it.duty|pct }}</td><td>{% if it.group == 'alcohol' %}주세·교육세·부가세 추가{% elif it.group == 'tobacco' %}담배 세목 별도{% elif it.duty == 0 %}부가세 10%만{% else %}관세 {{ it.duty|pct }} + 부가세 10%{% endif %}</td></tr>{% endfor %}</tbody></table>
 {% endblock %}
