@@ -95,7 +95,12 @@
       text = `물품가 미화 ${r.usd.toFixed(0)}달러로 한도 ${r.limit}달러를 ${over.toFixed(0)}달러 넘어 전체가 과세됩니다. 과세가격 ${won(r.taxable)}${r.ftaOk ? ' · FTA 적용으로 관세 0%' : ''}.`;
     }
     const rows = r.lines.map(([n, v]) => `<tr><th>${n}</th><td>${won(v)}</td></tr>`).join('');
-    const nearLimit = !r.exempt && !r.partial && r.usd - r.limit < 30 && r.method !== 'unsupported' ? `<p class="sheet-text tip">한도를 ${(r.usd - r.limit).toFixed(0)}달러만 넘었습니다. 물품가를 ${country.symbol}${Math.floor(r.limit * FX.USD / FX[cur]).toLocaleString('ko-KR')} 아래로 맞추면 세금 ${won(r.tax)}이 사라집니다.</p>` : '';
+    let nearLimit = '';
+    if (!r.exempt && !r.partial && r.method !== 'unsupported' && r.usd - r.limit < 30) {
+      const under = Math.floor(r.limit * FX.USD / FX[cur]);
+      const saved = item.group === 'alcohol' ? r.lines.filter(([n]) => /관세|부가세/.test(n)).reduce((s, [, v]) => s + v, 0) : r.tax;
+      nearLimit = `<p class="sheet-text tip">한도를 ${(r.usd - r.limit).toFixed(0)}달러만 넘었습니다. 물품가를 ${country.symbol}${under.toLocaleString('ko-KR')} 아래로 맞추면 ${item.group === 'alcohol' ? `관세·부가세 ${won(saved)}이 빠집니다(주세·교육세는 남음)` : `세금 ${won(saved)}이 사라집니다`}.</p>`;
+    }
     const actions = `<p class="sheet-actions"><a class="next" href="${base}items/${item.slug}/from/${country.slug}/">${country.name}에서 ${item.name} 직구 가이드</a><a class="next" href="https://www.coupang.com/np/search?q=${encodeURIComponent(item.name)}" rel="nofollow noopener" target="_blank">쿠팡 국내가와 비교</a></p>`;
     out.innerHTML = `<section class="sheet ${cls}"><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>해외 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지·국내 배송</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
   }
