@@ -506,3 +506,5 @@ header.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;just
 .prose h2+p{padding-bottom:28px;border-bottom:1px solid var(--line)}
 .hero{padding:28px 0 8px}.hero h1{max-width:20ch}
 @media (prefers-color-scheme:dark){.calc-grid .card,.list{background:var(--surface);border-color:var(--line)}.calc-grid .pick,.calc-grid .num-in,.money{background:var(--surface-2)}.calc-grid .pick:focus,.calc-grid .num-in:focus,.money:focus-within{background:var(--surface)}}
+.calc .row+.row,.calc .row+details,.calc details+.row{margin-top:16px}
+.tbl tr:last-child th,.tbl tr:last-child td{border-bottom:none}
