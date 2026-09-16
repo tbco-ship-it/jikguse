@@ -23,7 +23,8 @@ jobs:
       - run: pip install jinja2
       - name: Refresh weekly customs FX
         run: |
-          python scripts/fetch_fx.py
+          # UNIPASS sometimes refuses non-Korean IPs; never let a fetch failure block the deploy.
+          python scripts/fetch_fx.py || echo "fx fetch failed; keeping committed data/fx.json"
           if ! git diff --quiet data/fx.json; then
             git config user.name "fx-bot" && git config user.email "fx-bot@users.noreply.github.com"
             git add data/fx.json && git commit -m "fx: weekly 과세환율 $(date -u +%F)" && git push
