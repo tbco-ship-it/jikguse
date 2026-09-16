@@ -92,7 +92,7 @@
     const cur = country.currency;
     $('cur1').textContent = `(${cur})`; $('cur2').textContent = `(${cur})`;
     const price = num($('price')), ship = num($('ship')), fwd = num($('fwd')), fta = $('fta').checked, simp = $('simp').checked;
-    if (!price) { out.innerHTML = `<section class="sheet balanced quiet"><p class="sheet-title">가격을 넣으면 바로 계산됩니다</p><p class="sheet-text">${country.name} · ${item.name} · 면세 한도 미화 ${(country.courier200 && !item.excluded) ? 200 : 150}달러 = ${country.symbol}${Math.round(((country.courier200 && !item.excluded) ? 200 : 150) * FX.USD / FX[cur]).toLocaleString('ko-KR')} (이번 주 과세환율)</p></section>`; return; }
+    if (!price) { out.innerHTML = `<section class="sheet balanced quiet"><p class="sheet-title">가격을 넣으면 바로 계산됩니다</p><p class="sheet-text">${country.name} · ${item.name} · 면세 한도 미화 ${(country.courier200 && !item.excluded) ? 200 : 150}달러${cur === 'USD' ? '' : ` = ${country.symbol}${Math.round(((country.courier200 && !item.excluded) ? 200 : 150) * FX.USD / FX[cur]).toLocaleString('ko-KR')} (이번 주 과세환율)`}</p></section>`; return; }
     const r = compute(item, country, price, ship, fwd, fta, simp);
     const cls = r.exempt ? 'balanced' : r.eff > 60 ? 'severe' : r.eff > 20 ? 'moderate' : 'mild';
     let title, text;
