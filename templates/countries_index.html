@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}나라별 직구 관세 — 면세 한도 환산과 FTA | {{ site }}{% endblock %}
+{% block content %}
+<h1>나라별 직구 관세</h1>
+<table class="tbl"><thead><tr><th>나라</th><th>통화</th><th>150달러 =</th><th>FTA</th></tr></thead>
+<tbody>{% for c in countries %}<tr><td><a href="{{ base }}from/{{ c.slug }}/">{{ c.name }}</a></td><td>{{ c.currency }}</td><td>{{ c.symbol }}{{ "{:,}".format((150 * fx.rates.USD / fx.rates[c.currency])|int) }}</td><td>{{ c.fta_name }}</td></tr>{% endfor %}</tbody></table>
+<p class="muted small">이번 주 과세환율({{ fx.applies_from }}~{{ fx.applies_to }}) 기준.</p>
+{% endblock %}

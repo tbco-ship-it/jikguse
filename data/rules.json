@@ -1,0 +1,84 @@
+{
+ "_note": "간이세율: 관세법 시행령 별표2(개정 2023-02-28) 원문 확인(data/annex2_simplified_rates.txt). 제96조②: 무세·감면 물품, 종량세 물품, 고가품(관세청장 고시), 화주 요청 시 간이세율 미적용 → 일반세율(관세+부가세).",
+ "exemption_usd": 150,
+ "exemption_usd_us_courier": 200,
+ "vat": 0.1,
+ "default_method": "simplified",
+ "simplified_rates": {
+  "fur": 0.19,
+  "apparel": 0.18,
+  "other": 0.15,
+  "antler": 0.21
+ },
+ "simplified_cap_usd": 1000,
+ "fta_no_certificate_usd": {
+  "us": 1000,
+  "de": 1000,
+  "fr": 1000,
+  "uk": 1000,
+  "au": 1000,
+  "cn": 700
+ },
+ "alcohol": {
+  "whisky": {
+   "name": "위스키·브랜디·보드카·진·럼 (증류주)",
+   "duty": 0.2,
+   "liquor": 0.72,
+   "edu": 0.3
+  },
+  "wine": {
+   "name": "와인·샴페인 (과실주)",
+   "duty": 0.15,
+   "liquor": 0.3,
+   "edu": 0.1
+  },
+  "sake": {
+   "name": "사케·청주",
+   "duty": 0.15,
+   "liquor": 0.3,
+   "edu": 0.1
+  },
+  "liqueur": {
+   "name": "리큐르 (증류주 기준)",
+   "duty": 0.2,
+   "liquor": 0.72,
+   "edu": 0.3
+  }
+ },
+ "alcohol_exemption": {
+  "bottles": 1,
+  "liters": 1.0,
+  "usd": 400,
+  "_note": "여행자 기준. 특송 직구 적용 여부 검수 중(질문 2)."
+ },
+ "luxury": {
+  "watch_bag": {
+   "threshold_krw": 1923000,
+   "base_krw": 288450,
+   "over_rate": 0.45,
+   "items": [
+    "watch",
+    "bag"
+   ]
+  },
+  "jewelry": {
+   "threshold_krw": 4808000,
+   "base_krw": 721200,
+   "over_rate": 0.45,
+   "items": [
+    "jewelry"
+   ]
+  },
+  "_note": "별표2 제1호 나·다. 개당 과세가격 기준. 기준 이하는 15%와 동일(288,450=1,923,000×15%)."
+ },
+ "_cap_note": "고가품 기준(제96조②5나, 관세청장 고시) — US$1,000으로 가정, Popo 확인 중",
+ "vat_exempt_items": [
+  "books"
+ ],
+ "consumption_tax": {
+  "threshold_krw": 2000000,
+  "rate": 0.2,
+  "edu": 0.3,
+  "_note": "개별소비세법: 고급시계·가방·귀금속 등 개당 200만원 초과분 20% + 교육세 30%. Popo 확인 중."
+ }
+}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ country.name }} 직구 관세 총정리 — 면세 한도 {{ country.currency }} 환산, FTA, 품목별 세율 (2026) | {{ site }}{% endblock %}
+{% block description %}{{ country.name }} 해외직구 관세: 면세 한도를 이번 주 과세환율로 {{ country.currency }} 환산, {{ country.fta_name }} 적용 조건, 자주 사는 품목별 세율과 예상 세금.{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{{ base }}">홈</a> › <a href="{{ base }}from/">나라별</a> › {{ country.name }}</nav>
+<h1>{{ country.name }} 직구 관세</h1>
+<section class="sheet balanced">
+  <div class="sheet-num"><span class="num">{{ country.symbol }}{{ "{:,}".format(limit_local|int) }}</span></div>
+  <p class="sheet-title">이번 주 면세 한도 (미화 150달러)</p>
+  <p class="sheet-text">과세환율 1 {{ country.currency }} = {{ fx.rates[country.currency] }}원 ({{ fx.applies_from }}~{{ fx.applies_to }}).{% if country.courier200 %} 특송으로 오는 목록통관 물품은 200달러 = {{ country.symbol }}{{ "{:,}".format(limit200_local|int) }}까지 면세.{% endif %} 건강기능식품·식품·주류·기능성 화장품은 어디서 오든 150달러.</p>
+</section>
+<div class="ad-slot"><!-- ad: country_top --></div>
+<div class="prose">
+<h2>FTA</h2>
+<p>{{ country.fta_name }}. {{ country.fta_note }}{% if country.fta %} 원산지증명서 없이 적용 가능한 한도: 미화 {{ country.cert_free_usd }}달러.{% endif %}</p>
+<h2>알아둘 점</h2>
+<p>{{ country.tip }}</p>
+</div>
+<h2>품목별 예상 세금</h2>
+<table class="tbl"><thead><tr><th>품목</th><th>통관</th><th>과세 시 세율</th><th></th></tr></thead>
+<tbody>{% for it in items %}<tr><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">{{ it.name }}</a></td><td>{{ '일반통관' if it.excluded else '목록통관' }}</td><td>{% if it.group == 'alcohol' %}관세 {{ it.duty|pct }} + 주세·교육세·부가세{% elif it.group == 'tobacco' %}별도 계산{% elif it.duty == 0 %}부가세 10%{% else %}간이 {{ rules.simplified_rates[it.group]|pct }}{% if country.fta %} · FTA 시 10%{% endif %}{% endif %}</td><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">계산</a></td></tr>{% endfor %}</tbody></table>
+{% endblock %}

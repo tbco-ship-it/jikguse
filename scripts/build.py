@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Generate the static 직구세 site into dist/."""
+import argparse
+import hashlib
+import json
+import shutil
+from datetime import date
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+from model import RULES, compute, won
+
+ROOT = Path(__file__).resolve().parent.parent
+DIST = ROOT / "dist"
+SITE = "직구세"
+
+
+def load():
+    items = json.loads((ROOT / "data/items.json").read_text())
+    countries = json.loads((ROOT / "data/countries.json").read_text())
+    fx = json.loads((ROOT / "data/fx.json").read_text())
+    return items, countries, fx
+
+
+def examples(item, country, fx):
+    """Three worked examples at low/mid/high USD-equivalent prices, in shop currency."""
+    out = []
+    usd_rate = fx["rates"]["USD"] / fx["rates"][country["currency"]]
+    for usd in item["ex"]:
+        price = round(usd * usd_rate, -1 if country["currency"] in ("JPY",) else 0)
+        ship = round(25 * usd_rate, -1 if country["currency"] in ("JPY",) else 0)
+        out.append({"price": price, "ship": ship, "r": compute(item, country, price, ship, fx)})
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--base", default="/")
+    ap.add_argument("--origin", default="https://tbco-ship-it.github.io")
+    ap.add_argument("--cname", default="")
+    ap.add_argument("--adsense-pub", default="pub-8425563704095379")
+    args = ap.parse_args()
+    base = args.base if args.base.endswith("/") else args.base + "/"
+    origin = args.origin.rstrip("/")
+
+    items, countries, fx = load()
+    h = hashlib.md5()
+    for f in sorted((ROOT / "static").glob("*")):
+        h.update(f.read_bytes())
+    v = h.hexdigest()[:8]
+
+    env = Environment(loader=FileSystemLoader(ROOT / "templates"), autoescape=select_autoescape(["html"]))
+    env.filters["won"] = won
+    env.filters["pct"] = lambda r: f"{r * 100:g}%"
+    env.globals.update(site=SITE, base=base, origin=origin, today=date.today().isoformat(), v=v,
+                       adsense_pub=args.adsense_pub, items=items, countries=countries, fx=fx, rules=RULES)
+
+    if DIST.exists():
+        shutil.rmtree(DIST)
+    DIST.mkdir()
+    shutil.copytree(ROOT / "static", DIST / "static")
+    (DIST / "static/data.json").write_text(json.dumps({"items": items, "countries": countries, "fx": fx, "rules": RULES}, ensure_ascii=False, separators=(",", ":")))
+
+    urls = []
+
+    def write(path, template, **ctx):
+        out = DIST / path
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "index.html").write_text(env.get_template(template).render(path=path, **ctx))
+        urls.append(path)
+
+    write("", "index.html")
+    for page in ("about", "methodology", "privacy", "contact"):
+        write(f"{page}/", f"{page}.html")
+    for g in ("list-clearance", "combined-tax", "fx", "fta"):
+        write(f"guide/{g}/", f"guide_{g}.html")
+
+    write("items/", "items_index.html")
+    for it in items:
+        us = next(c for c in countries if c["slug"] == "us")
+        write(f"items/{it['slug']}/", "item.html", item=it, ex=examples(it, us, fx), us=us)
+        for c in countries:
+            write(f"items/{it['slug']}/from/{c['slug']}/", "item_country.html", item=it, country=c, ex=examples(it, c, fx))
+    write("from/", "countries_index.html")
+    for c in countries:
+        limit_local = RULES["exemption_usd"] * fx["rates"]["USD"] / fx["rates"][c["currency"]]
+        limit200_local = RULES["exemption_usd_us_courier"] * fx["rates"]["USD"] / fx["rates"][c["currency"]]
+        write(f"from/{c['slug']}/", "country.html", country=c, limit_local=limit_local, limit200_local=limit200_local)
+
+    sm = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for u in urls:
+        sm.append(f"<url><loc>{origin}{base}{u}</loc><lastmod>{date.today().isoformat()}</lastmod></url>")
+    sm.append("</urlset>")
+    (DIST / "sitemap.xml").write_text("\n".join(sm))
+    (DIST / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {origin}{base}sitemap.xml\n")
+    (DIST / "404.html").write_text(env.get_template("404.html").render(path="404"))
+    (DIST / ".nojekyll").write_text("")
+    key = (ROOT / "static/indexnow-key.txt").read_text().strip()
+    (DIST / f"{key}.txt").write_text(key + "\n")
+    if args.adsense_pub:
+        (DIST / "ads.txt").write_text(f"google.com, {args.adsense_pub}, DIRECT, f08c47fec0942fa0\n")
+    if args.cname:
+        (DIST / "CNAME").write_text(args.cname + "\n")
+    print(f"built {len(urls)} pages -> {DIST}")
+
+
+if __name__ == "__main__":
+    main()

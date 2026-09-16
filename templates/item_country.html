@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ country.name }}에서 {{ item.name }} 직구 관세·총비용 계산 (2026년 {{ fx.applies_from[5:7]|int }}월 환율) | {{ site }}{% endblock %}
+{% block description %}{{ country.name }}({{ country.currency }})에서 {{ item.name }}을(를) 직구할 때 면세 한도{% if country.courier200 and not item.excluded %} 200달러{% else %} 150달러{% endif %}, {% if country.fta %}{{ country.fta_name }} 적용 조건, {% endif %}가격대별 예상 세금과 총비용. 이번 주 관세청 과세환율 적용.{% endblock %}
+{% block head %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"{{ site }}","item":"{{ origin }}{{ base }}"},{"@type":"ListItem","position":2,"name":"{{ item.name }}","item":"{{ origin }}{{ base }}items/{{ item.slug }}/"},{"@type":"ListItem","position":3,"name":"{{ country.name }}에서 {{ item.name }}","item":"{{ origin }}{{ base }}{{ path }}"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"{{ country.name }}에서 {{ item.name }} 직구하면 얼마까지 면세인가요?","acceptedAnswer":{"@type":"Answer","text":"물품 가격 기준 미화 {{ 200 if (country.courier200 and not item.excluded) else 150 }}달러까지 면세입니다. 이번 주 과세환율로 약 {{ country.symbol }}{{ "{:,}".format(((200 if (country.courier200 and not item.excluded) else 150) * fx.rates.USD / fx.rates[country.currency])|int) }}입니다.{% if item.excluded %} {{ item.name }}은(는) 목록통관 배제 품목이라 수입신고를 거칩니다.{% endif %}"}},{"@type":"Question","name":"{{ country.name }} 원산지면 관세가 없나요?","acceptedAnswer":{"@type":"Answer","text":"{% if country.fta %}{{ country.fta_name }} 협정국 원산지 물품은 관세 0%가 적용될 수 있습니다. 과세가격 미화 {{ country.cert_free_usd }}달러 이하는 원산지증명서 없이 영수증·라벨로 신청합니다. {{ country.fta_note }}{% else %}{{ country.fta_note }}{% endif %}"}}]}</script>
+{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{{ base }}">홈</a> › <a href="{{ base }}items/{{ item.slug }}/">{{ item.name }}</a> › {{ country.name }}</nav>
+<h1>{{ country.name }}에서 {{ item.name }} 직구하면</h1>
+<p class="prose">면세 한도는 물품 가격 미화 <strong>{{ 200 if (country.courier200 and not item.excluded) else 150 }}달러</strong>, 이번 주 환율로 약 <strong>{{ country.symbol }}{{ "{:,}".format(((200 if (country.courier200 and not item.excluded) else 150) * fx.rates.USD / fx.rates[country.currency])|int) }}</strong>입니다{% if item.excluded %} ({{ item.name }}은(는) 목록통관 배제 품목){% endif %}. {{ country.tip }}{% if country.fta %} 원산지가 {{ country.name }}{% if country.slug in ['de','fr'] %}(EU){% endif %}이면 {{ country.fta_name }}로 관세가 0%가 되고, {{ country.cert_free_usd }}달러 이하는 영수증·라벨로 증명합니다.{% endif %}</p>
+
+<div class="ad-slot"><!-- ad: pair_top --></div>
+
+<h2>가격대별 예상 비용</h2>
+<p class="muted small">과세환율 1 {{ country.currency }} = {{ fx.rates[country.currency] }}원 ({{ fx.applies_from }}~{{ fx.applies_to }}), 해외 배송비 약 $25 가정. 배대지 요금 별도.</p>
+{% for e in ex %}{% include "_result.html" %}{% endfor %}
+
+<p class="prose"><a class="next" href="{{ base }}?item={{ item.slug }}&from={{ country.slug }}">내 가격으로 계산하기</a></p>
+
+<h2>{{ country.name }} 직구에서 자주 쓰는 쇼핑몰</h2>
+<p class="prose">{{ country.shops|join(', ') }}. 판매자마다 발송 방식(특송/우편)이 달라 한도가 바뀔 수 있습니다.</p>
+
+<div class="ad-slot"><!-- ad: pair_mid --></div>
+<h2>같은 나라, 다른 품목</h2>
+<ul class="cols">{% for o in items if o.slug != item.slug %}{% if loop.index <= 12 %}<li><a href="{{ base }}items/{{ o.slug }}/from/{{ country.slug }}/">{{ country.name }}에서 {{ o.name }}</a></li>{% endif %}{% endfor %}</ul>
+<h2>같은 품목, 다른 나라</h2>
+<ul class="cols">{% for c in countries if c.slug != country.slug %}<li><a href="{{ base }}items/{{ item.slug }}/from/{{ c.slug }}/">{{ c.name }}에서 {{ item.name }}</a></li>{% endfor %}</ul>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}이번 주 관세청 과세환율 ({{ fx.applies_from }}~{{ fx.applies_to }}) — 직구 면세 한도 환산표 | {{ site }}{% endblock %}
+{% block description %}관세청이 고시한 이번 주 과세환율(수입)과 미화 150·200달러 면세 한도의 통화별 환산 금액. 매주 자동 갱신.{% endblock %}
+{% block head %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"관세청 주간 과세환율 {{ fx.applies_from }}","description":"해외직구 과세가격 산정에 쓰이는 관세청 고시 과세환율(수입).","temporalCoverage":"{{ fx.applies_from }}/{{ fx.applies_to }}","creator":{"@type":"Organization","name":"관세청"},"license":"https://www.kogl.or.kr/info/license.do"}</script>{% endblock %}
+{% block content %}
+<h1>이번 주 과세환율</h1>
+<p class="prose">세관은 결제일 시장환율이 아니라 관세청이 매주 고시하는 <strong>과세환율</strong>로 물품 가격을 원화로 바꿉니다. 적용 기간 {{ fx.applies_from }} ~ {{ fx.applies_to }}, 출처 관세청 UNIPASS 주간환율(수입). 이 표는 매주 자동으로 갱신됩니다.</p>
+<table class="tbl"><thead><tr><th>통화</th><th>과세환율 (원)</th><th>150달러 한도</th><th>200달러 한도 (미국 특송)</th></tr></thead>
+<tbody>{% for cur, rate in fx.rates.items() %}<tr><td>{{ cur }}</td><td>{{ rate }}</td><td>{{ "{:,}".format((150 * fx.rates.USD / rate)|int) }}</td><td>{% if cur == 'USD' %}200{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table>
+<div class="ad-slot"><!-- ad: fx --></div>
+<div class="prose">
+<h2>왜 시장환율과 다른가요</h2>
+<p>과세환율은 직전 주 외국환 매도율을 평균해 매주 토요일 고시하고 일요일부터 토요일까지 적용합니다. 카드 결제 환율과 보통 1~2% 차이가 나서, 한도에 걸릴락 말락 한 주문은 이 표로 확인하는 게 정확합니다.</p>
+<h2>어느 시점 환율이 적용되나요</h2>
+<p>결제일이 아니라 <strong>수입신고일(통관일)</strong>이 속한 주의 환율입니다. 주문 후 배송에 1~2주가 걸리면 그 사이 환율이 바뀔 수 있어, 한도 근처 금액은 여유를 두세요.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}해외직구 관세 계산기 — 총비용을 한 번에 (관세청 과세환율 기준) | {{ site }}{% endblock %}
+{% block description %}품목과 가격만 넣으면 목록통관 여부, 관세·부가세(또는 간이세율), 주류 세금, 총 착지비용을 계산합니다. 이번 주 관세청 과세환율 자동 적용, 미국 200달러·150달러 한도 자동 판정.{% endblock %}
+{% block head %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"{{ site }} 해외직구 관세 계산기","applicationCategory":"FinanceApplication","operatingSystem":"Any","inLanguage":"ko","offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"},"url":"{{ origin }}{{ base }}"}</script>
+{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>이 물건, 직구하면 총 얼마일까요?</h1>
+  <p>품목과 가격을 넣으면 면세 여부부터 세금, 최종 비용까지 한 번에 나옵니다. 환율은 이번 주 관세청 과세환율({{ fx.rates.USD|int }}원/달러)을 씁니다.</p>
+</section>
+
+<section class="calc card" id="calc">
+  <div class="row">
+    <label class="field">어디서 사나요
+      <input id="country" class="pick" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" autocomplete="off" placeholder="미국, 일본, 알리…" data-kind="countries"><ul class="menu" id="country-menu" role="listbox" hidden></ul>
+    </label>
+    <label class="field">무엇을 사나요
+      <input id="item" class="pick" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" autocomplete="off" placeholder="위스키, 신발, 아이패드…" data-kind="items"><ul class="menu" id="item-menu" role="listbox" hidden></ul>
+    </label>
+  </div>
+  <div class="row">
+    <label class="field">물품 가격 <span class="unit" id="cur1"></span>
+      <input id="price" class="num-in" type="text" inputmode="decimal" placeholder="예: 180">
+    </label>
+    <label class="field">해외 배송비 <span class="unit" id="cur2"></span>
+      <input id="ship" class="num-in" type="text" inputmode="decimal" placeholder="없으면 0">
+    </label>
+  </div>
+  <details class="more">
+    <summary>배대지 요금, FTA 원산지</summary>
+    <div class="row">
+      <label class="field">배대지·국내 배송비 (원)<input id="fwd" class="num-in" type="text" inputmode="numeric" placeholder="예: 18000"></label>
+      <label class="check"><input id="fta" type="checkbox"> <span>원산지가 협정국(Made in USA·EU 등)이라 FTA 적용</span></label>
+    </div>
+  </details>
+  <div id="result" class="result" aria-live="polite"></div>
+  <p class="muted small">예상치입니다. 세관 심사와 배대지 실제 요금으로 달라질 수 있어요. <a href="{{ base }}methodology/">계산 방법 보기</a></p>
+</section>
+
+<div class="ad-slot"><!-- ad: home_below --></div>
+
+<section class="grid2">
+  <div>
+    <h2>품목별로 보기</h2>
+    <ul class="cols">{% for it in items[:16] %}<li><a href="{{ base }}items/{{ it.slug }}/">{{ it.name }}</a></li>{% endfor %}</ul>
+    <p><a href="{{ base }}items/">전체 {{ items|length }}개 품목</a></p>
+  </div>
+  <div>
+    <h2>나라별로 보기</h2>
+    <ul class="cols">{% for c in countries %}<li><a href="{{ base }}from/{{ c.slug }}/">{{ c.name }} 직구 관세</a></li>{% endfor %}</ul>
+    <p><a href="{{ base }}guide/fx/">이번 주 과세환율 표</a></p>
+  </div>
+</section>
+
+<section class="prose">
+  <h2>면세인지 아닌지가 먼저입니다</h2>
+  <p>물품 가격(배송비 제외)이 미화 150달러 이하면 세금이 없습니다. 미국에서 특송으로 오는 목록통관 물품은 200달러까지입니다. 한도를 1달러라도 넘으면 넘은 만큼이 아니라 <strong>전체 금액</strong>에 세금이 붙고, 이때는 배송비도 과세가격에 들어갑니다.</p>
+  <h2>세금은 보통 간이세율 하나로 붙습니다</h2>
+  <p>특송으로 들어오는 개인 물품에는 관세와 부가세를 합쳐 하나로 정한 <a href="{{ base }}methodology/">간이세율</a>이 적용됩니다. 의류·신발·섬유 18%, 모피 19%, 그 밖의 대부분 15%. 관세가 0%인 스마트폰·노트북·카메라나 FTA로 관세가 면제되는 물품은 간이세율 대신 부가세 10%만 냅니다. 주류는 관세·주세·교육세·부가세가 차례로 붙어 물품가보다 세금이 커지기도 합니다.</p>
+  <h2>합산과세를 피하는 법</h2>
+  <p>같은 날 같은 판매자에게 산 물건을 나눠 받거나, 배대지에서 한 운송장으로 묶어 보내면 금액이 합산되어 한도를 넘길 수 있습니다. 구매일을 나누거나 운송장을 분리하세요. <a href="{{ base }}guide/combined-tax/">합산과세 자세히</a></p>
+</section>
+<script src="{{ base }}static/calc.js?v={{ v }}" defer></script>
+{% endblock %}

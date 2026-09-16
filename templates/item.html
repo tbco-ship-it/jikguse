@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ item.name }} 직구 관세 계산 — 면세 한도, 세율, 예상 세금 (2026) | {{ site }}{% endblock %}
+{% block description %}{{ item.name }} 해외직구 시 {{ '목록통관 가능' if not item.excluded else '목록통관 불가(일반통관)' }}. 세율 {% if item.group == 'alcohol' %}관세 {{ item.duty|pct }} + 주세·교육세·부가세{% elif item.group == 'tobacco' %}담배 세목 별도(관세 40% + 개별소비세·담배소비세·지방교육세·부가세){% elif item.duty == 0 %}관세 0% + 부가세 10%{% else %}간이세율 {{ rules.simplified_rates[item.group]|pct }}(관세 {{ item.duty|pct }} 기준){% endif %}. 이번 주 과세환율로 계산한 가격대별 예상 세금.{% endblock %}
+{% block head %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"{{ item.name }} 직구는 얼마까지 면세인가요?","acceptedAnswer":{"@type":"Answer","text":"물품 가격(배송비 제외) 기준 미화 150달러까지 면세입니다.{% if not item.excluded %} 미국에서 특송으로 오면 200달러까지 목록통관으로 면세됩니다.{% else %} {{ item.name }}은(는) 목록통관 배제 품목이라 미국발이어도 150달러가 기준이고 수입신고(일반통관)를 거칩니다.{% endif %} 한도를 넘으면 전체 금액에 과세됩니다."}},
+{"@type":"Question","name":"{{ item.name }} 직구 세율은 얼마인가요?","acceptedAnswer":{"@type":"Answer","text":"{% if item.group == 'alcohol' %}관세 {{ item.duty|pct }}, 주세 {{ rules.alcohol[item.alcohol].liquor|pct }}, 교육세(주세의 {{ rules.alcohol[item.alcohol].edu|pct }}), 부가세 10%가 차례로 붙습니다.{% elif item.group == 'tobacco' %}담배 세목 별도(관세 40% + 개별소비세·담배소비세·지방교육세·부가세){% elif item.duty == 0 %}관세가 0%인 품목이라 부가세 10%만 냅니다.{% else %}특송 개인 물품은 간이세율 {{ rules.simplified_rates[item.group]|pct }}가 관세와 부가세를 합쳐 한 번에 붙습니다. 일반세율로 신고하면 관세 {{ item.duty|pct }} + 부가세 10%입니다.{% endif %}"}}
+]}</script>
+{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{{ base }}">홈</a> › <a href="{{ base }}items/">품목별</a> › {{ item.name }}</nav>
+<h1>{{ item.name }} 직구 관세</h1>
+<p class="prose">{% if item.excluded %}<strong>목록통관이 안 되는 품목</strong>입니다. 어디서 오든 미화 150달러까지만 면세이고, 수입신고(일반통관)를 거칩니다.{% else %}목록통관 가능 품목입니다. 미화 150달러(미국발 특송은 200달러)까지 면세, 넘으면 전체에 과세.{% endif %}
+{% if item.group == 'alcohol' %} 세금은 관세 {{ item.duty|pct }} → 주세 {{ rules.alcohol[item.alcohol].liquor|pct }} → 교육세(주세의 {{ rules.alcohol[item.alcohol].edu|pct }}) → 부가세 10% 순서로 붙습니다.{% elif item.group == 'tobacco' %}담배 세목 별도(관세 40% + 개별소비세·담배소비세·지방교육세·부가세){% elif item.duty == 0 %} 관세 0% 품목이라 과세되더라도 부가세 10%만 냅니다.{% else %} 과세되면 간이세율 <strong>{{ rules.simplified_rates[item.group]|pct }}</strong>(관세·부가세 통합)가 붙습니다. 원산지가 FTA 협정국이면 관세가 빠져 부가세 10%만.{% endif %}
+{% if item.note %} {{ item.note }}{% endif %}</p>
+
+<div class="ad-slot"><!-- ad: item_top --></div>
+
+<h2>미국에서 살 때 가격대별 예상 비용</h2>
+<p class="muted small">이번 주 과세환율 1달러 = {{ fx.rates.USD|int }}원, 해외 배송비 $25 가정. 배대지 요금은 별도.</p>
+{% set country = us %}{% for e in ex %}{% include "_result.html" %}{% endfor %}
+
+<h2>다른 나라에서 살 때</h2>
+<ul class="best">{% for c in countries %}<li><a href="{{ base }}items/{{ item.slug }}/from/{{ c.slug }}/">{{ c.name }}에서 {{ item.name }} 직구</a> <span class="muted">{{ c.currency }} · {% if c.fta %}{{ c.fta_name }}{% else %}FTA 없음{% endif %}</span></li>{% endfor %}</ul>
+
+<h2>직접 계산하기</h2>
+<p class="prose"><a class="next" href="{{ base }}?item={{ item.slug }}">{{ item.name }} 가격 넣고 계산</a></p>
+
+<div class="ad-slot"><!-- ad: item_mid --></div>
+<h2>함께 보는 품목</h2>
+<ul class="cols">{% for o in items if o.group == item.group and o.slug != item.slug %}<li><a href="{{ base }}items/{{ o.slug }}/">{{ o.name }}</a></li>{% endfor %}</ul>
+{% endblock %}

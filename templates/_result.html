@@ -1,0 +1,6 @@
+{# server-rendered worked example: e = {price, ship, r} #}
+<section class="sheet {{ 'balanced' if e.r.exempt else ('severe' if e.r.tax_rate_effective > 60 else 'mild') }}">
+  <div class="sheet-num"><span class="num">{{ "{:,}".format(e.r.total) }}</span><span class="pct">원</span></div>
+  <p class="sheet-title">{% if e.r.exempt %}면세 — 세금 0원{% else %}세금 {{ e.r.tax_total|won }} ({{ e.r.tax_rate_effective }}%){% endif %} · {{ e.r.clearance }}</p>
+  <p class="sheet-text">{{ country.symbol }}{{ "{:,}".format(e.price|int) }} + 배송 {{ country.symbol }}{{ "{:,}".format(e.ship|int) }} = 미화 {{ e.r.price_usd|int }}달러{% if e.r.exempt %} → 한도 {{ e.r.limit_usd }}달러 이내라 세금이 없습니다.{% else %} → 한도 {{ e.r.limit_usd }}달러 초과. 과세가격 {{ e.r.taxable_krw|won }}에 {% for n, v, r in e.r.lines %}{{ n }} {{ v|won }}{% if not loop.last %}, {% endif %}{% endfor %}.{% endif %}</p>
+</section>

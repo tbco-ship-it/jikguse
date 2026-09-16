@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ site }}{% endblock %}</title>
+<meta name="description" content="{% block description %}해외직구 관세·부가세·총비용을 관세청 주간 과세환율로 계산합니다. 목록통관 한도, 합산과세, FTA, 주류 세금까지.{% endblock %}">
+<link rel="canonical" href="{{ origin }}{{ base }}{{ path }}">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="{{ base }}static/style.css?v={{ v }}">
+<link rel="icon" href="{{ base }}static/favicon.svg?v={{ v }}" type="image/svg+xml">
+{% if adsense_pub %}<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-{{ adsense_pub }}" crossorigin="anonymous"></script>{% endif %}
+{% block head %}{% endblock %}
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="{{ base }}">{{ site }}</a>
+  <nav>
+    <a href="{{ base }}">계산기</a>
+    <a href="{{ base }}items/">품목별</a>
+    <a href="{{ base }}from/">나라별</a>
+    <a href="{{ base }}guide/fx/">이번 주 환율</a>
+    <a href="{{ base }}guide/list-clearance/">면세 기준</a>
+  </nav>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+<footer>
+  <p><a href="{{ base }}about/">소개</a> · <a href="{{ base }}methodology/">계산 방법</a> · <a href="{{ base }}privacy/">개인정보처리방침</a> · <a href="{{ base }}contact/">문의</a></p>
+  <p class="muted">세액은 관세청 고시 과세환율({{ fx.applies_from }}~{{ fx.applies_to }} 적용)과 관세법 시행령 별표 2 간이세율을 기준으로 한 예상치입니다. 실제 세액은 세관 심사로 확정됩니다. 마지막 확인 {{ today }}.</p>
+</footer>
+</body>
+</html>
