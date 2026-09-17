@@ -868,5 +868,1075 @@
    400
   ],
   "note": "담배는 관세 40%에 개별소비세·담배소비세·지방교육세·부가세가 개비/그램 단위로 붙습니다. 이 계산기는 담배 세액을 아직 계산하지 않습니다 — 안내 페이지를 참고하세요."
+ },
+ {
+  "slug": "keyboard-mouse",
+  "name": "키보드·마우스",
+  "aliases": [
+   "키보드",
+   "마우스"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8471.60(컴퓨터용 입력장치) WTO ITA 협정 무세(0%). 부가세 10%만 부과."
+ },
+ {
+  "slug": "external-ssd",
+  "name": "외장 SSD·USB 메모리",
+  "aliases": [
+   "외장 SSD",
+   "USB 메모리"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8523.51(솔리드스테이트 불휘발성 기억장치) ITA 무세(0%)."
+ },
+ {
+  "slug": "smartwatch",
+  "name": "스마트워치·스마트밴드",
+  "aliases": [
+   "스마트워치",
+   "스마트밴드"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8517.62(무선통신/스마트워치) 무세(0%). 일반 시계(HS 9102, 8%)와 구분 주의."
+ },
+ {
+  "slug": "power-bank",
+  "name": "보조배터리",
+  "aliases": [
+   "보조배터리"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8507.60(리튬이온축전지) 기본관세율 8%."
+ },
+ {
+  "slug": "phone-charger",
+  "name": "고속 충전기·어댑터",
+  "aliases": [
+   "고속 충전기",
+   "어댑터"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8504.40(정지형 변환기/전자기기용 충전기) ITA 무세(0%)."
+ },
+ {
+  "slug": "stylus-pen",
+  "name": "태블릿 펜슬·스타일러스",
+  "aliases": [
+   "태블릿 펜슬",
+   "스타일러스"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8471.60(디지타이저/전자펜 입력장치) ITA 무세(0%)."
+ },
+ {
+  "slug": "usb-dock",
+  "name": "USB 허브·도킹스테이션",
+  "aliases": [
+   "USB 허브",
+   "도킹스테이션"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8471.80(자동자료처리기계 단위기기/허브) ITA 무세(0%)."
+ },
+ {
+  "slug": "portable-projector",
+  "name": "휴대용 프로젝터·미니빔",
+  "aliases": [
+   "휴대용 프로젝터",
+   "미니빔"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8528.62(컴퓨터 연결용 프로젝터) ITA 무세(0%)."
+ },
+ {
+  "slug": "wifi-router",
+  "name": "와이파이 공유기·라우터",
+  "aliases": [
+   "와이파이 공유기",
+   "라우터"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8517.62(유무선 라우터/네트워크 기기) ITA 무세(0%)."
+ },
+ {
+  "slug": "3d-printer",
+  "name": "3D 프린터",
+  "aliases": [
+   "3D 프린터"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8477.80(플라스틱 적층 가공 기계) 기본관세율 8%."
+ },
+ {
+  "slug": "coffee-machine",
+  "name": "에스프레소 커피머신",
+  "aliases": [
+   "에스프레소 커피머신"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   600
+  ],
+  "note": "HS 8516.71(전기식 커피메이커/에스프레소 머신) 기본관세율 8%."
+ },
+ {
+  "slug": "air-fryer",
+  "name": "에어프라이어·전기오븐",
+  "aliases": [
+   "에어프라이어",
+   "전기오븐"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   600
+  ],
+  "note": "HS 8516.60(전기오븐/쿠커/에어프라이어) 기본관세율 8%."
+ },
+ {
+  "slug": "blender",
+  "name": "믹서기·블렌더·핸드블렌더",
+  "aliases": [
+   "믹서기",
+   "블렌더",
+   "핸드블렌더"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   600
+  ],
+  "note": "HS 8509.40(식품용 믹서기/분쇄기) 기본관세율 8%."
+ },
+ {
+  "slug": "electric-kettle",
+  "name": "전기포트·무선주전자",
+  "aliases": [
+   "전기포트",
+   "무선주전자"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   600
+  ],
+  "note": "HS 8516.79(가정용 전열주전자) 기본관세율 8%."
+ },
+ {
+  "slug": "kitchen-knife",
+  "name": "주방용 식칼·셰프 나이프",
+  "aliases": [
+   "주방용 식칼",
+   "셰프 나이프"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 8211.92(날이 고정된 주방칼) 기본관세율 8%. 도검소지허가 비대상 확인 필요."
+ },
+ {
+  "slug": "cookware",
+  "name": "냄비·프라이팬·무쇠팬",
+  "aliases": [
+   "냄비",
+   "프라이팬",
+   "무쇠팬"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 7615.10(알루미늄제 식탁/주방용품) 또는 7323(철강제) 기본관세율 8%."
+ },
+ {
+  "slug": "baby-stroller",
+  "name": "유모차",
+  "aliases": [
+   "유모차"
+  ],
+  "group": "other",
+  "duty": 0.05,
+  "excluded": false,
+  "ex": [
+   50,
+   150,
+   400
+  ],
+  "note": "HS 8715.00(유모차 및 부분품) 기본관세율 3% (낮은 특례기본세율). HS 8715 유모차 5%(관세청 조회기 기준)."
+ },
+ {
+  "slug": "baby-car-seat",
+  "name": "유아용 카시트",
+  "aliases": [
+   "유아용 카시트"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   50,
+   150,
+   400
+  ],
+  "note": "HS 9401.80(자동차용 어린이 안전의자/카시트) 기본세율 0% 무세. HS 9401.80 기본세율 8%(관세청 조회기 카시트 8%). ITA 대상 아님."
+ },
+ {
+  "slug": "baby-bottle",
+  "name": "젖병·수유용품",
+  "aliases": [
+   "젖병",
+   "수유용품"
+  ],
+  "group": "other",
+  "duty": 0.065,
+  "excluded": false,
+  "ex": [
+   50,
+   150,
+   400
+  ],
+  "note": "HS 3924.10(플라스틱제 식탁/주방용품) WTO 협정세율 6.5% (기본 8%). 입에 닿는 식기류 통관 주의."
+ },
+ {
+  "slug": "baby-diaper",
+  "name": "기저귀·위생패드",
+  "aliases": [
+   "기저귀",
+   "위생패드"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   50,
+   150,
+   400
+  ],
+  "note": "HS 9619.00(유아용 기저귀 및 유사품) 기본관세율 8%."
+ },
+ {
+  "slug": "baby-carrier",
+  "name": "아기띠·힙시트",
+  "aliases": [
+   "아기띠",
+   "힙시트"
+  ],
+  "group": "apparel",
+  "duty": 0.13,
+  "excluded": false,
+  "ex": [
+   50,
+   150,
+   400
+  ],
+  "note": "HS 6307.90(방직용 섬유 기타 제품) 기본 13%, 방직용 섬유 제품으로 간이세율 18% 대상."
+ },
+ {
+  "slug": "probiotics",
+  "name": "유산균·프로바이오틱스",
+  "aliases": [
+   "유산균",
+   "프로바이오틱스"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 2106.90(기타 조제식료품/건강보조제) 기본 8%. 자가사용 인정기준 6병 초과 시 요건확인 대상."
+ },
+ {
+  "slug": "omega3",
+  "name": "오메가3·피시오일",
+  "aliases": [
+   "오메가3",
+   "피시오일"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 2106.90(어유 캡슐/식이보충제) 기본 8%. 건강기능식품 자가사용 6병 제한."
+ },
+ {
+  "slug": "protein-powder",
+  "name": "단백질 보충제·프로틴",
+  "aliases": [
+   "단백질 보충제",
+   "프로틴"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 2106.90(단백질 농축물/식품보충제) 기본 8% (단, 유청 함량에 따라 HS 0404 세번 변동 가능)."
+ },
+ {
+  "slug": "collagen",
+  "name": "콜라겐 펩타이드·이너뷰티",
+  "aliases": [
+   "콜라겐 펩타이드",
+   "이너뷰티"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 2106.90(식이보충 조제품) 기본 8%."
+ },
+ {
+  "slug": "minerals",
+  "name": "마그네슘·아연·칼슘 영양제",
+  "aliases": [
+   "마그네슘",
+   "아연",
+   "칼슘 영양제"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 2106.90(미네랄 비타민 복합제제) 기본 8%, 자가사용 6병 제한."
+ },
+ {
+  "slug": "lipstick",
+  "name": "립스틱·틴트·립밤",
+  "aliases": [
+   "립스틱",
+   "틴트",
+   "립밤"
+  ],
+  "group": "other",
+  "duty": 0.065,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 3304.10(입술화장용 제품류) WTO 협정세율 6.5% (기본 8%)."
+ },
+ {
+  "slug": "eye-makeup",
+  "name": "아이섀도·마스카라·아이라이너",
+  "aliases": [
+   "아이섀도",
+   "마스카라",
+   "아이라이너"
+  ],
+  "group": "other",
+  "duty": 0.065,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 3304.20(눈화장용 제품류) WTO 협정세율 6.5% (기본 8%)."
+ },
+ {
+  "slug": "shampoo",
+  "name": "샴푸·헤어트리트먼트",
+  "aliases": [
+   "샴푸",
+   "헤어트리트먼트"
+  ],
+  "group": "other",
+  "duty": 0.05,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 3305.10(샴푸) / 3305.90(기타 두발용 제품) 기본 8%. HS 3305.10 샴푸 5%(관세청 조회기 기준); 트리트먼트 등 3305.90은 8%일 수 있음."
+ },
+ {
+  "slug": "body-wash",
+  "name": "바디워시·비누·스크럽",
+  "aliases": [
+   "바디워시",
+   "비누",
+   "스크럽"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 3401.30(액체상이나 크림상의 피부세척용 제품) 기본 8%."
+ },
+ {
+  "slug": "hair-dryer",
+  "name": "헤어드라이어·고데기",
+  "aliases": [
+   "헤어드라이어",
+   "고데기"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 8516.31(헤어드라이어) / 8516.32(기타 전열식 이미용기기) 기본 8%."
+ },
+ {
+  "slug": "beauty-device",
+  "name": "LED 마스크·피부미용기기",
+  "aliases": [
+   "LED 마스크",
+   "피부미용기기"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   30,
+   80,
+   200
+  ],
+  "note": "HS 8543.70(전기식 피부마사지기/미용기구) 기본 8% (의료기기 분류 여부 확인 필요)."
+ },
+ {
+  "slug": "camping-tent",
+  "name": "캠핑 텐트·타프",
+  "aliases": [
+   "캠핑 텐트",
+   "타프"
+  ],
+  "group": "apparel",
+  "duty": 0.13,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   700
+  ],
+  "note": "HS 6306.22(합성섬유제 텐트) 기본 13%, 방직용 섬유 제품으로 간이세율 18% 대상."
+ },
+ {
+  "slug": "camping-stove",
+  "name": "캠핑 버너·스토브",
+  "aliases": [
+   "캠핑 버너",
+   "스토브"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   700
+  ],
+  "note": "HS 7321.11(가스 연료용 조리기구) 기본 8%."
+ },
+ {
+  "slug": "sleeping-bag",
+  "name": "캠핑 침낭",
+  "aliases": [
+   "캠핑 침낭"
+  ],
+  "group": "apparel",
+  "duty": 0.13,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   700
+  ],
+  "note": "HS 9404.30(침낭) 기본 13%, 간이세율 18% 대상."
+ },
+ {
+  "slug": "ski-snowboard",
+  "name": "스키·스노보드 장비",
+  "aliases": [
+   "스키",
+   "스노보드 장비"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   700
+  ],
+  "note": "HS 9506.11(설상스키) / 9506.12(바인딩) 기본 8%."
+ },
+ {
+  "slug": "yoga-mat",
+  "name": "요가매트·폼롤러·스트레칭용품",
+  "aliases": [
+   "요가매트",
+   "폼롤러",
+   "스트레칭용품"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   700
+  ],
+  "note": "HS 9506.91(체조/운동용구) 기본 8%."
+ },
+ {
+  "slug": "bike-trainer",
+  "name": "자전거 스마트로라·실내트레이너",
+  "aliases": [
+   "자전거 스마트로라",
+   "실내트레이너"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   80,
+   250,
+   700
+  ],
+  "note": "HS 9506.91(운동용구) 기본 8%."
+ },
+ {
+  "slug": "dash-cam",
+  "name": "차량용 블랙박스·대시캠",
+  "aliases": [
+   "차량용 블랙박스",
+   "대시캠"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 8525.80(디지털 비디오카메라 레코더) ITA 무세(0%)."
+ },
+ {
+  "slug": "car-air-purifier",
+  "name": "차량용 공기청정기",
+  "aliases": [
+   "차량용 공기청정기"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 8421.39(기체여과기/공기청정기) 기본 8%."
+ },
+ {
+  "slug": "motorcycle-helmet",
+  "name": "오토바이 헬멧·안전모",
+  "aliases": [
+   "오토바이 헬멧",
+   "안전모"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 6506.10(안전모/오토바이용 헬멧) 기본 8%."
+ },
+ {
+  "slug": "tire-inflator",
+  "name": "무선 타이어 공기주입기·펌프",
+  "aliases": [
+   "무선 타이어 공기주입기",
+   "펌프"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 8414.20(공기펌프) / 8414.80 기본 8%."
+ },
+ {
+  "slug": "car-phone-mount",
+  "name": "차량용 무선충전 거치대",
+  "aliases": [
+   "차량용 무선충전 거치대"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 8504.40(무선충전 송신기능 내장형) ITA 무세(0%). 단순 플라스틱 거치대는 HS 3926 6.5%."
+ },
+ {
+  "slug": "digital-piano",
+  "name": "전자피아노·마스터키보드",
+  "aliases": [
+   "전자피아노",
+   "마스터키보드"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   100,
+   400,
+   1200
+  ],
+  "note": "HS 9207.10(전기식 건반악기/신디사이저) 기본 8%."
+ },
+ {
+  "slug": "violin",
+  "name": "바이올린·첼로·현악기",
+  "aliases": [
+   "바이올린",
+   "첼로",
+   "현악기"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   100,
+   400,
+   1200
+  ],
+  "note": "HS 9202.10(찰현악기/바이올린) 기본 8%."
+ },
+ {
+  "slug": "audio-interface",
+  "name": "오디오 인터페이스·믹서",
+  "aliases": [
+   "오디오 인터페이스",
+   "믹서"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   100,
+   400,
+   1200
+  ],
+  "note": "HS 8543.70(음향신호 믹서기/사운드카드) ITA 무세(0%)."
+ },
+ {
+  "slug": "recording-mic",
+  "name": "콘덴서 마이크·녹음용 마이크",
+  "aliases": [
+   "콘덴서 마이크",
+   "녹음용 마이크"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   100,
+   400,
+   1200
+  ],
+  "note": "HS 8518.10(마이크로폰) 기본 8%."
+ },
+ {
+  "slug": "guitar-effector",
+  "name": "기타 이펙터·페달보드",
+  "aliases": [
+   "기타 이펙터",
+   "페달보드"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   100,
+   400,
+   1200
+  ],
+  "note": "HS 8543.70(악기용 음향효과기/이펙터) 기본 8%."
+ },
+ {
+  "slug": "camera-lens",
+  "name": "카메라 렌즈 단품",
+  "aliases": [
+   "카메라 렌즈 단품"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 9002.11(카메라용 교환렌즈/대물렌즈) 기본관세율 8%."
+ },
+ {
+  "slug": "camera-tripod",
+  "name": "카메라 삼각대·짐벌",
+  "aliases": [
+   "카메라 삼각대",
+   "짐벌"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 9620.00(삼각대·일각대) 기본 8% (단, 전동 짐벌 복합기기는 HS 8479 분류 시 8%)."
+ },
+ {
+  "slug": "telescope",
+  "name": "천체망원경·쌍안경",
+  "aliases": [
+   "천체망원경",
+   "쌍안경"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   500
+  ],
+  "note": "HS 9005.10(쌍안경) / 9005.80(천체망원경) 기본 8%."
+ },
+ {
+  "slug": "action-cam",
+  "name": "액션캠·360도 카메라",
+  "aliases": [
+   "액션캠",
+   "360도 카메라"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   600
+  ],
+  "note": "HS 8525.80(디지털 액션 비디오카메라) ITA 무세(0%)."
+ },
+ {
+  "slug": "handheld-console",
+  "name": "휴대용 게임기·UMPC",
+  "aliases": [
+   "휴대용 게임기",
+   "UMPC"
+  ],
+  "group": "other",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   500
+  ],
+  "note": "HS 9504.50(비디오 게임 콘솔 및 기계) 기본 0% 무세."
+ },
+ {
+  "slug": "game-controller",
+  "name": "게임패드·조이콘·아케이드스틱",
+  "aliases": [
+   "게임패드",
+   "조이콘",
+   "아케이드스틱"
+  ],
+  "group": "other",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   500
+  ],
+  "note": "HS 9504.50(비디오 게임기 부분품/컨트롤러) 기본 0% 무세."
+ },
+ {
+  "slug": "vr-headset",
+  "name": "VR 헤드셋·스마트 글래스",
+  "aliases": [
+   "VR 헤드셋",
+   "스마트 글래스"
+  ],
+  "group": "ita",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   500
+  ],
+  "note": "HS 8528.52(헤드마운트 디스플레이 모니터) ITA 무세(0%)."
+ },
+ {
+  "slug": "drone",
+  "name": "촬영용 드론·RC 헬리콥터",
+  "aliases": [
+   "촬영용 드론",
+   "RC 헬리콥터"
+  ],
+  "group": "other",
+  "duty": 0,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   500
+  ],
+  "note": "HS 8806.21(무인비행장치/드론) 기본 0% 무세. 전파법 자가사용 1대 한정."
+ },
+ {
+  "slug": "board-game",
+  "name": "보드게임·카드게임",
+  "aliases": [
+   "보드게임",
+   "카드게임"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   500
+  ],
+  "note": "HS 9504.90(테이블 게임/보드게임) 기본 8%."
+ },
+ {
+  "slug": "plastic-model",
+  "name": "프라모델·건프라·피규어 키트",
+  "aliases": [
+   "프라모델",
+   "건프라",
+   "피규어 키트"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   60,
+   200,
+   500
+  ],
+  "note": "HS 9503.00(축척모형 조립용 완구) 기본 8%."
+ },
+ {
+  "slug": "electric-toothbrush",
+  "name": "전동칫솔·구강세정기",
+  "aliases": [
+   "전동칫솔",
+   "구강세정기"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   100,
+   300,
+   800
+  ],
+  "note": "HS 8509.80(가정용 전동 구강위생기기) 기본 8%."
+ },
+ {
+  "slug": "robot-vacuum",
+  "name": "로봇청소기",
+  "aliases": [
+   "로봇청소기"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   100,
+   300,
+   800
+  ],
+  "note": "HS 8508.11(자체 모터 내장형 진공청소기) 기본 8%."
+ },
+ {
+  "slug": "luggage-suitcase",
+  "name": "여행용 캐리어·수트케이스",
+  "aliases": [
+   "여행용 캐리어",
+   "수트케이스"
+  ],
+  "group": "other",
+  "duty": 0.08,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 4202.12(플라스틱제/방직용 트렁크/캐리어) 기본 8%."
+ },
+ {
+  "slug": "umbrella",
+  "name": "우산·양산",
+  "aliases": [
+   "우산",
+   "양산"
+  ],
+  "group": "other",
+  "duty": 0.13,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 6601.91(접는 우산) 기본관세율 13%."
+ },
+ {
+  "slug": "leather-belt",
+  "name": "가죽 벨트",
+  "aliases": [
+   "가죽 벨트"
+  ],
+  "group": "apparel",
+  "duty": 0.13,
+  "excluded": false,
+  "ex": [
+   40,
+   120,
+   300
+  ],
+  "note": "HS 4203.30(가죽제 벨트) 기본 8%, 가죽제 의류 부속품으로 간이세율 18% 대상. HS 4203.30 가죽 벨트 13%(관세청 조회기 기준)."
  }
 ]
