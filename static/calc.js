@@ -86,7 +86,7 @@
     (function step(t) { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(target * e); if (k < 1) requestAnimationFrame(step); })(t0);
   }
 
-  // Home: the first priced result ends the landing state — hero + card glide up from centre (FLIP on padding-top) while the hidden sections below are armed to reveal.
+  // Home: the first priced result ends the landing state — hero + card glide up from centre (FLIP on transform) while the hidden sections below are armed to reveal.
   function leaveLanding() {
     const html = document.documentElement; if (!html.classList.contains('landing')) return;
     const stage = $('stage'), hero = stage.firstElementChild;
@@ -94,9 +94,10 @@
     html.classList.remove('landing');
     const dy = y0 - hero.getBoundingClientRect().top;
     if (dy > 0 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      stage.style.transition = 'none'; stage.style.paddingTop = dy + 'px'; void stage.offsetHeight;
-      stage.style.transition = 'padding-top 1s cubic-bezier(.16,1,.3,1)'; stage.style.paddingTop = '0px';
-      stage.addEventListener('transitionend', () => { stage.style.transition = ''; stage.style.paddingTop = ''; }, { once: true });
+      // transform, not padding: the glide must not register as layout shift (CLS)
+      stage.style.transition = 'none'; stage.style.transform = `translateY(${dy}px)`; void stage.offsetHeight;
+      stage.style.transition = 'transform 1s cubic-bezier(.16,1,.3,1)'; stage.style.transform = 'translateY(0)';
+      stage.addEventListener('transitionend', () => { stage.style.transition = ''; stage.style.transform = ''; }, { once: true });
     }
     if (window.__reveal) window.__reveal($('below'), true, 500);
   }
