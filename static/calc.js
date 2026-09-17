@@ -111,12 +111,13 @@
   function render() {
     const item = picked.items, country = picked.countries;
     if (!item || !country) return;
+    // Currency labels follow the country even before a price is typed.
+    const cur = country.currency;
+    $('cur1').textContent = cur; $('cur2').textContent = cur;
     // Landing: nothing is shown until a price is typed; the "type a price" placeholder sheet only appears once the page has opened up.
     if (document.documentElement.classList.contains('landing') && !num($('price'))) return;
     const first = document.documentElement.classList.contains('landing');
     leaveLanding();
-    const cur = country.currency;
-    $('cur1').textContent = cur; $('cur2').textContent = cur;
     const price = num($('price')), ship = num($('ship')), fwd = num($('fwd')), fta = $('fta').checked, simp = $('simp').checked;
     if (!price) { out.innerHTML = `<section class="sheet balanced quiet"><p class="sheet-label">예상 결제 총액</p><p class="sheet-title">가격을 넣으면 바로 계산됩니다</p><p class="sheet-text">${country.name} · ${item.name} · 면세 한도 미화 ${(country.courier200 && !item.excluded) ? 200 : 150}달러${cur === 'USD' ? '' : ` = ${country.symbol}${Math.round(((country.courier200 && !item.excluded) ? 200 : 150) * FX.USD / FX[cur]).toLocaleString('ko-KR')} (이번 주 과세환율)`}</p></section>`; return; }
     const r = compute(item, country, price, ship, fwd, fta, simp);
@@ -138,7 +139,7 @@
       nearLimit = `<p class="sheet-text tip">한도를 ${(r.usd - r.limit).toFixed(0)}달러만 넘었습니다. 물품가를 ${country.symbol}${under.toLocaleString('ko-KR')} 아래로 맞추면 ${item.group === 'alcohol' ? `관세·부가세 ${won(saved)}이 빠집니다(주세·교육세는 남음)` : `세금 ${won(saved)}이 사라집니다`}.</p>`;
     }
     const actions = `<p class="sheet-actions"><a class="next" href="${base}items/${item.slug}/from/${country.slug}/">${country.name}에서 ${item.name} 직구 가이드</a><a class="next" href="https://www.coupang.com/np/search?q=${encodeURIComponent(item.name)}" rel="nofollow noopener" target="_blank">쿠팡 국내가와 비교</a></p>`;
-    out.innerHTML = `<section class="sheet ${cls}"><p class="sheet-label">예상 결제 총액</p><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>해외 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지·국내 배송</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
+    out.innerHTML = `<section class="sheet ${cls}"><p class="sheet-label">예상 결제 총액</p><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>현지 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지·국내 배송</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
     document.querySelectorAll('.sheet-num .num').forEach(countUp);
     if (first) riseIn();
   }
