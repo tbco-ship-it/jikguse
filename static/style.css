@@ -67,7 +67,7 @@ footer a{color:var(--text-2)}
 .seg span{display:block;padding:8px 18px;border-radius:11px;font-size:.95rem;font-weight:600;color:var(--text-2);cursor:pointer;transition:background .15s,color .15s}
 .seg input:checked+span{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .seg input:focus-visible+span{outline:3px solid var(--blue)}
-.result{margin-top:16px;min-height:1em}
+.result{margin-top:16px}.result:empty{display:none}
 
 /* verdict sheet — the one loud element */
 .sheet{background:var(--blue-soft);border-radius:var(--r-sheet);padding:28px 24px 24px;margin:20px 0 8px}
@@ -548,10 +548,11 @@ header.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;just
 .sec-h{padding:0 2px;margin-bottom:6px}
 @media (prefers-color-scheme:dark){.list{background:transparent;border:0}}
 
-/* Scroll reveal (restrained) */
-.reveal{opacity:0;transform:translateY(12px);transition:opacity .45s ease,transform .45s cubic-bezier(.2,.8,.2,1)}
-.reveal.is-in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+/* Scroll reveal: each block trails the scroll — rises 40px, blur→sharp, siblings 110ms apart */
+.rv{opacity:0;transform:translateY(40px);filter:blur(6px);transition:opacity .8s ease-out var(--d,0s),transform 1s cubic-bezier(.16,1,.3,1) var(--d,0s),filter .7s ease-out var(--d,0s)}
+.reveal.is-in .rv,.reveal.is-in.rv{opacity:1;transform:none;filter:none}
+.list.rv,.tbl.rv,.result>.sheet.rv{filter:none}/* tall blocks: blur would rasterize a huge layer */
+@media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;filter:none;transition:none}}
 
 /* Dark-mode audit 2026-09-16 (iPhone): every surface must derive from tokens, never a literal light color */
 @media (prefers-color-scheme:dark){
@@ -575,3 +576,12 @@ header.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;just
 /* ---- CWV: reserve result space (CLS), underline prose links (a11y) ---- */
 .result:empty{min-height:380px;border-radius:var(--r-sheet);background:var(--surface)}
 .prose a,.sheet-text a,footer a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,currentColor 40%,transparent)}
+
+/* Landing: hero + calculator card alone, centred in the first viewport; the rest (.below) stays hidden until the first priced result.
+   The html.landing class is set by an inline script on the home page (skipped for deep links with ?item=…) and removed by calc.js on the first result. */
+.stage{max-width:640px;margin:0 auto}
+.stage .calc-grid{grid-template-columns:1fr}
+html.landing .stage{display:flex;flex-direction:column;justify-content:center;min-height:calc(100svh - var(--hdr,60px) - 8px)}
+.stage .hero{padding-top:0}/* no padding jump when the landing state ends on small screens */
+.num-in::placeholder{color:var(--muted);font-weight:500}/* example amounts must not read as typed values */
+html.landing .below{display:none}

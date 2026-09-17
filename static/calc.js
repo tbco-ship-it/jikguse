@@ -86,9 +86,34 @@
     (function step(t) { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(target * e); if (k < 1) requestAnimationFrame(step); })(t0);
   }
 
+  // Home: the first priced result ends the landing state — hero + card glide up from centre (FLIP on padding-top) while the hidden sections below are armed to reveal.
+  function leaveLanding() {
+    const html = document.documentElement; if (!html.classList.contains('landing')) return;
+    const stage = $('stage'), hero = stage.firstElementChild;
+    const y0 = hero.getBoundingClientRect().top;
+    html.classList.remove('landing');
+    const dy = y0 - hero.getBoundingClientRect().top;
+    if (dy > 0 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      stage.style.transition = 'none'; stage.style.paddingTop = dy + 'px'; void stage.offsetHeight;
+      stage.style.transition = 'padding-top 1s cubic-bezier(.16,1,.3,1)'; stage.style.paddingTop = '0px';
+      stage.addEventListener('transitionend', () => { stage.style.transition = ''; stage.style.paddingTop = ''; }, { once: true });
+    }
+    if (window.__reveal) window.__reveal($('below'), true, 500);
+  }
+  // Result rises in Toss-style: label → amount → title → text → table → actions, 90ms apart.
+  function riseIn() {
+    const sheet = out.querySelector('.sheet'); if (!sheet) return;
+    out.classList.remove('is-in'); out.classList.add('reveal');
+    [sheet, ...sheet.children].forEach((el, i) => { el.classList.add('rv'); el.style.setProperty('--d', (i * 90) + 'ms'); });
+    void out.offsetHeight; out.classList.add('is-in');
+  }
   function render() {
     const item = picked.items, country = picked.countries;
     if (!item || !country) return;
+    // Landing: nothing is shown until a price is typed; the "type a price" placeholder sheet only appears once the page has opened up.
+    if (document.documentElement.classList.contains('landing') && !num($('price'))) return;
+    const first = document.documentElement.classList.contains('landing');
+    leaveLanding();
     const cur = country.currency;
     $('cur1').textContent = cur; $('cur2').textContent = cur;
     const price = num($('price')), ship = num($('ship')), fwd = num($('fwd')), fta = $('fta').checked, simp = $('simp').checked;
@@ -114,6 +139,7 @@
     const actions = `<p class="sheet-actions"><a class="next" href="${base}items/${item.slug}/from/${country.slug}/">${country.name}에서 ${item.name} 직구 가이드</a><a class="next" href="https://www.coupang.com/np/search?q=${encodeURIComponent(item.name)}" rel="nofollow noopener" target="_blank">쿠팡 국내가와 비교</a></p>`;
     out.innerHTML = `<section class="sheet ${cls}"><p class="sheet-label">예상 결제 총액</p><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>해외 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지·국내 배송</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
     document.querySelectorAll('.sheet-num .num').forEach(countUp);
+    if (first) riseIn();
   }
 
   picker($('country'), D.countries, c => c.name, c => [c.name, c.currency, ...(c.shops || [])], 'us', () => { render(); });
