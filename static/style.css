@@ -585,3 +585,4 @@ html.landing .stage{display:flex;flex-direction:column;justify-content:center;mi
 .stage .hero{padding-top:0}/* no padding jump when the landing state ends on small screens */
 .num-in::placeholder{color:var(--muted);font-weight:500}/* example amounts must not read as typed values */
 html.landing .below{display:none}
+#result{scroll-margin-top:calc(var(--hdr,64px) + 16px)}/* phone: the result scrolls to just below the sticky header */

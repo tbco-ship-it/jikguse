@@ -18,7 +18,7 @@
     let items = [], active = -1;
     const remembered = params.get(input.dataset.kind === 'items' ? 'item' : 'from') || localStorage.getItem('jikguse.' + input.dataset.kind);
     choose(list.find(x => x.slug === remembered) || list.find(x => x.slug === initialSlug) || list[0], false);
-    function choose(x, fire = true) { picked[input.dataset.kind] = x; input.value = labelOf(x); localStorage.setItem('jikguse.' + input.dataset.kind, x.slug); close(); onPick && onPick(x); if (fire) render(); }
+    function choose(x, fire = true) { picked[input.dataset.kind] = x; input.value = labelOf(x); localStorage.setItem('jikguse.' + input.dataset.kind, x.slug); close(); onPick && onPick(x); if (fire) render(true); }
     function rank(x, q) { const t = searchOf(x).map(norm); if (t.includes(q)) return 0; if (t.some(k => k.startsWith(q))) return 1; return 2; }
     function open(q) {
       const nq = norm(q);
@@ -108,7 +108,12 @@
     [sheet, ...sheet.children].forEach((el, i) => { el.classList.add('rv'); el.style.setProperty('--d', (i * 90) + 'ms'); });
     void out.offsetHeight; out.classList.add('is-in');
   }
-  function render() {
+  // On a phone the result sits below the form (often behind the browser's bottom bar): bring it into view so a tap visibly did something.
+  // Layout position (offsetTop chain), not the rendered box: right after the first result the stage is mid-glide (translateY) and
+  // scrollIntoView would land ~100px too far down; scroll-margin-top keeps the target below the sticky header.
+  const bringIntoView = el => { if (innerWidth >= 900) return; setTimeout(() => { let y = 0; for (let e = el; e; e = e.offsetParent) y += e.offsetTop; y -= parseFloat(getComputedStyle(el).scrollMarginTop) || 0; scrollTo({ top: y, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }, 60); };
+  // scroll=true: a committed change (pick, price/ship/fwd change event, checkbox) — not per keystroke while the keyboard is up.
+  function render(scroll) {
     const item = picked.items, country = picked.countries;
     if (!item || !country) return;
     // Currency labels follow the country even before a price is typed.
@@ -142,12 +147,13 @@
     out.innerHTML = `<section class="sheet ${cls}"><p class="sheet-label">예상 결제 총액</p><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>현지 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지·국내 배송</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
     document.querySelectorAll('.sheet-num .num').forEach(countUp);
     if (first) riseIn();
+    if (scroll === true) bringIntoView(out);
   }
 
   picker($('country'), D.countries, c => c.name, c => [c.name, c.currency, ...(c.shops || [])], 'us', () => { render(); });
   picker($('item'), D.items, i => i.name, i => [i.name, ...(i.aliases || [])], 'clothing');
-  ['price', 'ship', 'fwd'].forEach(id => $(id).addEventListener('input', render));
-  $('fta').addEventListener('change', render); $('simp').addEventListener('change', render);
+  ['price', 'ship', 'fwd'].forEach(id => { $(id).addEventListener('input', () => render(false)); $(id).addEventListener('change', () => { if (num($('price'))) render(true); }); });
+  $('fta').addEventListener('change', () => render(true)); $('simp').addEventListener('change', () => render(true));
   if (params.get('price')) $('price').value = params.get('price');
   window.addEventListener('pageshow', render);
   render();
