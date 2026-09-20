@@ -103,5 +103,55 @@
     };
   }
 
-  root.BizCalc = { AGREEMENTS, ORIGINS, rateFor, compute, floor10 };
+  // HS 6-digit (what forwarders' forms use) → the 10-digit rows under it. Resolved when there is one row, or when every
+  // row carries identical rates and flags (then any row gives the same answer); otherwise the caller must let the user pick.
+  function resolveH6(codes, h6) {
+    const group = codes.filter(c => c.c.startsWith(h6));
+    if (!group.length) return { entry: null, n: 0, same: false, group };
+    const sig = c => [c.r.join(','), !!c.q, !!c.u].join('|');
+    const same = group.every(c => sig(c) === sig(group[0]));
+    return { entry: group.length === 1 || same ? group[0] : null, n: group.length, same, group };
+  }
+
+  // Parse text copied from a forwarder's application page (QuickStar 신청서조회 / 결제정보 layout): item blocks
+  // "[HS6] name … 단가 10.43 CNY … 수량 115", shipping "총배송요금 185,000 KRW" (or "배송비\n185,000 KRW"), the
+  // non-dutiable add-ons (부가서비스·추가요금: 신고대행·C/O 발급·원산지작업…) and whether a C/O was issued.
+  function parseSheet(text) {
+    const t = String(text || '').replace(/\r/g, '');
+    const num = s => parseFloat(String(s).replace(/,/g, ''));
+    const marks = [];
+    const re = /\[(\d{6})\]/g;
+    let m;
+    while ((m = re.exec(t))) marks.push({ h6: m[1], at: m.index });
+    const lines = [];
+    let cur = null;
+    marks.forEach((p, i) => {
+      const seg = t.slice(p.at, marks[i + 1] ? marks[i + 1].at : p.at + 800);
+      const pm = seg.match(/단가\s*([\d,]+(?:\.\d+)?)\s*([A-Z]{3})/), qm = seg.match(/수량\s*([\d,]+)/);
+      if (!pm || !qm) return;
+      const price = num(pm[1]), qty = parseInt(qm[1].replace(/,/g, ''), 10);
+      if (!(price > 0 && qty > 0)) return;
+      cur = cur || pm[2];
+      const dup = lines.find(l => l.h6 === p.h6 && l.price === price);
+      if (dup) dup.qty += qty; else lines.push({ h6: p.h6, qty, price });
+    });
+    const goods = lines.reduce((s, l) => s + l.qty * l.price, 0);
+    const decl = t.match(/총구매비\s*:?\s*([\d,]+(?:\.\d+)?)\s*([A-Z]{3})/);
+    let totalKrw = 0, exclKrw = 0;
+    const pay = t.match(/총배송요금\s*([\d,]+)\s*KRW/);
+    if (pay) { // 결제정보 popup: itemised add-ons
+      totalKrw = num(pay[1]);
+      for (const mm of t.matchAll(/(?:부가서비스\[[^\]]*\]|추가요금)\s*([\d,]+)\s*KRW/g)) exclKrw += num(mm[1]);
+    } else {
+      const ship = t.match(/(?:^|\n)배송비\s*\n?\s*([\d,]+)\s*KRW/);
+      if (ship) totalKrw = num(ship[1]);
+      const blk = t.match(/부가서비스\[출고\]([\s\S]*?)(?:\n운송방법|$)/);
+      if (blk) for (const mm of blk[1].matchAll(/\)\s+([\d,]+)\s*(?:\n|$)/g)) exclKrw += num(mm[1]);
+    }
+    const co = /\d\s*원산지증명서|원산지증명서 발급\([^)]*\)\s+[\d,]+\s*(?:\n|$)/.test(t);
+    return { lines, cur, goods: Math.round(goods * 100) / 100, declared: decl ? { amount: num(decl[1]), cur: decl[2] } : null,
+      totalKrw, exclKrw, co, origin: cur === 'CNY' ? 'CN' : null };
+  }
+
+  root.BizCalc = { AGREEMENTS, ORIGINS, rateFor, compute, floor10, resolveH6, parseSheet };
 })(typeof window !== 'undefined' ? window : globalThis);

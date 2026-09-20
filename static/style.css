@@ -644,3 +644,15 @@ html.landing .below{display:none}
   .add{border-color:var(--line)}
   .add:hover{background:var(--blue-soft)}
 }
+/* business: paste panel, HS6 hints, two-field freight */
+.sub-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.sub-row .sub-h{margin-bottom:0}
+.link-btn{border:0;background:transparent;color:var(--blue);font:inherit;font-size:.9rem;font-weight:700;cursor:pointer;padding:6px 0}.link-btn:hover{text-decoration:underline}
+.paste{margin-top:10px;background:var(--surface);border-radius:16px;padding:12px}
+.paste textarea{width:100%;box-sizing:border-box;border:0;border-radius:12px;background:var(--bg);color:var(--text);font:inherit;font-size:.9rem;padding:12px;resize:vertical;min-height:110px}
+.paste textarea:focus{outline:none;box-shadow:0 0 0 2px rgba(49,130,246,.25)}
+.paste-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}.paste-actions .next{margin:0;width:auto;padding:11px 16px}
+.menu li small.rate{color:var(--blue);font-weight:600}
+.fr-note{margin:8px 0 0}
+.more{margin-top:12px}.more summary{cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:6px}.more summary::before{content:"+";font-weight:700}.more[open] summary::before{content:"−"}.more summary::-webkit-details-marker{display:none}.more .field{margin-top:10px}
+@media (prefers-color-scheme:dark){.paste{background:var(--surface-2)}.paste textarea{background:var(--surface)}}
+.bm-help{margin:10px 0 0}.bm{display:inline-block;padding:6px 12px;border-radius:10px;background:var(--blue);color:#fff;font-weight:700;text-decoration:none;cursor:grab}

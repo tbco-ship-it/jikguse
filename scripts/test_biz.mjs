@@ -72,4 +72,47 @@ t('flags: 세관장확인 and specific-duty entries are marked', () => {
   assert.ok(orange.x && orange.x.includes('FAU1'), 'seasonal FAU1 row expired → flagged');
 });
 
+t('resolveH6: single row, identical rows, and rows that differ', () => {
+  for (const h6 of ['620453', '871499', '630710', '962000']) { const r = BizCalc.resolveH6(HS.codes, h6); assert.equal(r.n, 1); assert.ok(r.entry); }
+  const groups = {};
+  for (const c of HS.codes) (groups[c.c.slice(0, 6)] ||= []).push(c);
+  const stats = { single: 0, same: 0, differ: 0 };
+  for (const h6 of Object.keys(groups)) { const r = BizCalc.resolveH6(HS.codes, h6); stats[r.n === 1 ? 'single' : r.same ? 'same' : 'differ']++; if (!r.same && r.n > 1) assert.equal(r.entry, null); }
+  assert.equal(stats.single + stats.same + stats.differ, Object.keys(groups).length);
+  assert.ok(stats.single + stats.same > stats.differ, `auto-resolved ${stats.single + stats.same} vs pick ${stats.differ}`);
+  assert.equal(BizCalc.resolveH6(HS.codes, '999999').n, 0);
+});
+
+t('parseSheet: QuickStar 신청서조회 text → merged lines, currency, declared total, shipping', () => {
+  const apply = readFileSync(join(ROOT, 'scripts/fixtures/quickstar_apply.txt'), 'utf8');
+  const P = BizCalc.parseSheet(apply);
+  assert.deepEqual(P.lines, [{ h6: '620453', qty: 235, price: 10.43 }, { h6: '871499', qty: 350, price: 3.82 }, { h6: '871499', qty: 150, price: 4.83 },
+    { h6: '620453', qty: 100, price: 11 }, { h6: '630710', qty: 3000, price: 0.14 }, { h6: '962000', qty: 20, price: 28.5 }]); // 9 form rows → 6 (same HS + same price merged)
+  assert.equal(P.cur, 'CNY'); assert.equal(P.origin, 'CN');
+  assert.equal(P.goods, 6602.55); assert.deepEqual(P.declared, { amount: 6602.55, cur: 'CNY' });
+  assert.equal(P.totalKrw, 185000); assert.equal(P.exclKrw, 20000); // only 선적서류작성 is itemised on this page
+  assert.equal(P.co, false);
+});
+
+t('parseSheet: 결제정보 popup adds the full add-on split and C/O; both pages pasted together', () => {
+  const pay = readFileSync(join(ROOT, 'scripts/fixtures/quickstar_pay.txt'), 'utf8');
+  const P = BizCalc.parseSheet(pay);
+  assert.equal(P.totalKrw, 185000); assert.equal(P.exclKrw, 90000); // 20,000 선적서류 + 70,000 추가요금(C/O 발급·원산지작업)
+  assert.equal(P.co, true); assert.equal(P.lines.length, 0);
+  const both = BizCalc.parseSheet(readFileSync(join(ROOT, 'scripts/fixtures/quickstar_apply.txt'), 'utf8') + '\n' + pay);
+  assert.equal(both.lines.length, 6); assert.equal(both.totalKrw, 185000); assert.equal(both.exclKrw, 90000); assert.equal(both.co, true);
+  assert.deepEqual(BizCalc.parseSheet('nothing here').lines, []);
+});
+
+t('compute on the QuickStar shipment: freight 95,000 = 185,000 − 90,000, C/O on, 과세환율 CNY 208.51 (2026-08-23 week)', () => {
+  const both = BizCalc.parseSheet(readFileSync(join(ROOT, 'scripts/fixtures/quickstar_apply.txt'), 'utf8'));
+  const r = BizCalc.compute({ fx: { USD: 1387.76, CNY: 208.51 }, cur: 'CNY', cols: HS.cols, origin: 'CN', co: true, freight: 185000 - 90000, freightCur: 'KRW', insurance: 0, brokerageKrw: 90000,
+    lines: both.lines.map(l => ({ entry: BizCalc.resolveH6(HS.codes, l.h6).entry, qty: l.qty, price: l.price })) });
+  assert.equal(r.lines.length, 6); assert.equal(r.freightKrw, 95000); assert.equal(r.brokerage, 90000);
+  assert.equal(r.goodsKrw, Math.floor(6602.55 * 208.51)); // 1,376,697
+  assert.deepEqual(r.lines.map(l => l.rate.applied.code), ['E1', 'FCN1', 'FCN1', 'E1', 'FCN1', 'FCN1']); // skirts APTA 8.1%, rest 한·중 FTA
+  assert.equal(r.cif, r.lines.reduce((s, l) => s + l.cif, 0));
+  assert.ok(Math.abs(r.cif - (1376697 + 95000)) <= 6, 'allocation loses at most 1원 per line');
+});
+
 console.log(`${n} tests passed`);

@@ -21,26 +21,29 @@
       <select id="cur"></select>
     </label>
   </div>
-  <h3 class="sub-h">품목</h3>
+  <div class="sub-row"><h3 class="sub-h">품목</h3><button type="button" class="link-btn" id="paste-toggle" aria-expanded="false" aria-controls="paste">신청서 붙여넣기</button></div>
+  <div id="paste" class="paste" hidden>
+    <textarea id="paste-text" rows="5" placeholder="배대지(퀵스타 등) '신청서조회' 화면을 전체 선택(⌘/Ctrl+A)·복사해서 붙여 넣으세요. [결제정보] 화면도 이어 붙이면 운임 나누기와 C/O 여부까지 채워집니다."></textarea>
+    <div class="paste-actions"><button type="button" class="next" id="paste-fill">품목·운임 채우기</button><span class="muted small" id="paste-note"></span></div>
+    <p class="muted small bm-help">한 번에 하려면: <a id="bm" class="bm" href="#" draggable="true">직구세로 보내기</a> 를 북마크바로 끌어다 놓고, 퀵스타 <b>신청서조회</b> 화면에서 누르세요. 품목·배송비·부가서비스·C/O가 채워진 채로 이 페이지가 열립니다(결제정보까지 자동으로 읽습니다).</p>
+  </div>
   <div id="lines" data-hs="{{ base }}static/hs.json?v={{ hv }}" data-req="{{ base }}static/hs_req.json?v={{ hv }}"></div>
   <button type="button" class="add" id="add">+ 품목 추가</button>
   <h3 class="sub-h">운임·비용</h3>
   <div class="row">
-    <label class="field"><span>국제운임 <small class="muted">(FOB→한국 도착)</small></span>
-      <span class="money"><select id="frcur" class="unit-sel" aria-label="운임 통화"></select><input id="freight" class="num-in" type="text" inputmode="decimal" placeholder="300" autocomplete="off"></span>
+    <label class="field"><span>배대지 청구액 <small class="muted">(총배송요금)</small></span>
+      <span class="money"><select id="frcur" class="unit-sel" aria-label="청구액 통화"></select><input id="total" class="num-in" type="text" inputmode="decimal" placeholder="185000" autocomplete="off"></span>
     </label>
+    <label class="field"><span>그중 과세 제외분 <small class="muted">(통관대행·서류·C/O·국내택배)</small></span>
+      <span class="money"><span class="unit" id="frcur2">KRW</span><input id="excl" class="num-in" type="text" inputmode="decimal" placeholder="90000" autocomplete="off"></span>
+    </label>
+  </div>
+  <p class="muted small fr-note" id="fr-note">과세가격에는 한국 도착까지의 운임·보험만 들어갑니다. 청구액에서 부가서비스를 뺀 나머지를 운임으로 씁니다. 퀵스타는 [결제정보]의 부가서비스·추가요금 합계가 과세 제외분입니다.</p>
+  <details class="more"><summary>보험료 따로 있음</summary>
     <label class="field">보험료
-      <span class="money"><span class="unit" id="frcur2">USD</span><input id="ins" class="num-in" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></span>
+      <span class="money"><span class="unit" id="frcur3">KRW</span><input id="ins" class="num-in" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></span>
     </label>
-  </div>
-  <div class="row">
-    <label class="field"><span>통관수수료·관세사 <small class="muted">(과세 제외)</small></span>
-      <span class="money"><span class="unit">KRW</span><input id="broker" class="num-in" type="text" inputmode="numeric" placeholder="30000" autocomplete="off"></span>
-    </label>
-    <label class="field"><span>국내 운송비 <small class="muted">(과세 제외)</small></span>
-      <span class="money"><span class="unit">KRW</span><input id="domestic" class="num-in" type="text" inputmode="numeric" placeholder="0" autocomplete="off"></span>
-    </label>
-  </div>
+  </details>
   <label class="check co"><input id="co" type="checkbox"> <span>원산지증명서(C/O) 있음 — 협정세율(FTA·RCEP) 적용</span></label>
   <p class="muted small">예상치입니다. 품목분류(HS)와 신고 세액의 책임은 신고인에게 있습니다. <a href="{{ base }}methodology/#business">계산 방법 보기</a></p>
 </div>
