@@ -211,10 +211,14 @@
     // measured values replace the estimates: 월 판매량 ← 지난 30일 판매량, 반품률 ← 반품률(월)
     const wingMonthly = () => W && (W.d30.sold != null ? W.d30.sold : W.d7.sold != null ? Math.round(W.d7.sold / 7 * 30) : null);
     const wingRet = () => W && W.ret.rate != null ? Math.round(W.ret.rate * 10) / 10 : null;
+    // 최종구매가 < 표시가 = 판매자 할인 (정산현황에서 '판매자 할인쿠폰'으로 차감되는 판매자 부담, 2026-09-21 확인) → 모델의 sellerDisc
+    const wingDisc = () => W && W.price.list > 0 && W.price.final != null && W.price.final < W.price.list ? Math.round((1 - W.price.final / W.price.list) * 1000) / 10 : null;
     function fillFromWing() {
-      const m = wingMonthly(), r = wingRet();
+      const m = wingMonthly(), r = wingRet(), dc = wingDisc();
       if (m != null) F.monthly.value = String(m);
       if (r != null) { F.ret.value = String(r); retTouched = true; }
+      if (W.price.list > 0 && !numv(F.price.value)) F.price.value = String(W.price.list);
+      if (dc != null) F.disc.value = String(dc);
     }
 
     function save() { if (KEY) localStorage.setItem(KEY, JSON.stringify(state())); }
@@ -364,6 +368,7 @@
       wingOpts.hidden = !W;
       F.monthly.closest('.field').classList.toggle('wing', !!W && wingMonthly() != null && F.monthly.value === String(wingMonthly()));
       F.ret.closest('.field').classList.toggle('wing', !!W && wingRet() != null && numv(F.ret.value) === wingRet());
+      F.disc.closest('.field').classList.toggle('wing', !!W && wingDisc() != null && numv(F.disc.value) === wingDisc());
       if (!W) { wingOut.innerHTML = ''; return; }
       const RgWing = root.RgWing, I = ev.I;
       const list = W.price.list, basis = W.price.final || list; // 쿠팡 예상 비용은 최종구매가 기준 (2,678 = 7,350 × 7.8% + 극소형 980 + 1,125)
@@ -376,7 +381,8 @@
       const catOff = inf && Math.abs(inf.gap) > 0.15; // 어느 유형으로도 안 맞으면 수수료율(카테고리)이 다르다
       const tone = perUnit != null && perUnit < 0 ? 'severe' : tierOff || catOff || (d.shortage > 0) || (d.trend != null && d.trend < -0.3) ? 'moderate' : 'balanced';
       const rows = [];
-      if (list) rows.push(['판매가', won(list), `${W.price.final != null && W.price.final !== list ? `최종구매가 ${won(W.price.final)} (자동조정 할인) · ` : ''}${d.revIsList === true ? `윙 매출 ${won(W.d30.rev)} = 단품 ${cnt(d.revUnits)}${d.revInferred ? '(역산)' : ''} × 표시가 — 할인·번들 매출은 이 집계에 없어 실판매가는 못 구합니다` : d.revIsList === false ? `윙 매출 ${won(W.d30.rev)} ÷ ${cnt(d.revUnits)} = ${won(d.revPerUnit)} — 윙 매출은 단품 판매분만 표시가로 집계해서 번들이 섞이면 낮게 나옵니다. 실판매가로 쓰지 마세요` : '매출 박스가 없어요'}`]);
+      const dc = wingDisc();
+      if (list) rows.push(['판매가', won(list), `${dc != null ? `최종구매가 ${won(W.price.final)} = 판매자 할인 ${dc}% (정산에서 '판매자 할인쿠폰'으로 빠지는 판매자 부담) → ${numv(F.disc.value) === dc ? '위 판매자 즉시할인 칸에 넣었어요' : '위 판매자 즉시할인 칸은 직접 고친 값이 우선입니다'} · ` : ''}${d.revIsList === true ? `윙 매출 ${won(W.d30.rev)} = 단품 ${cnt(d.revUnits)}${d.revInferred ? '(역산)' : ''} × 표시가 — 할인·번들 매출은 이 집계에 없어 실판매가는 못 구합니다` : d.revIsList === false ? `윙 매출 ${won(W.d30.rev)} ÷ ${cnt(d.revUnits)} = ${won(d.revPerUnit)} — 윙 매출은 단품 판매분만 표시가로 집계해서 번들이 섞이면 낮게 나옵니다. 실판매가로 쓰지 마세요` : '매출 박스가 없어요'}`]);
       if (d.rate != null) rows.push(['판매 속도', `하루 ${n1(d.rate)}개`, `${W.d7.sold != null ? `지난 7일 ${cnt(W.d7.sold)}` : ''}${W.d30.sold != null ? ` · 30일 ${cnt(W.d30.sold)} (하루 ${n1(d.rate30)}개)` : ''}${d.trend != null ? ` → 최근 7일이 30일 평균보다 ${signPct(d.trend)}` : ''}${W.y.sold != null ? ` · 어제 ${cnt(W.y.sold)}` : ''}`]);
       if (d.cvr.d7 != null || d.cvr.d30 != null) rows.push(['구매 전환율', pct1(d.cvr.d7 != null ? d.cvr.d7 : d.cvr.d30), `${d.cvr.d7 != null ? `7일 조회 ${W.d7.views.toLocaleString('ko-KR')} → 구매 ${W.d7.sold}` : ''}${d.cvr.d30 != null ? ` · 30일 ${pct1(d.cvr.d30)} (조회 ${W.d30.views.toLocaleString('ko-KR')})` : ''}`]);
       if (d.bundleShare != null) rows.push(['번들 비중 (30일)', pct1(d.bundleShare), `단품 ${cnt(W.d30.single)} · 번들 ${cnt(W.d30.bundle)} — 묶음이 많이 팔리면 위 낱개 vs 묶음 표의 묶음 판매가를 실제 값으로 맞춰 보세요`]);
