@@ -1232,7 +1232,7 @@
   ],
   "group": "other",
   "duty": 0.08,
-  "excluded": false,
+  "excluded": true,
   "ex": [
    30,
    80,
@@ -1249,7 +1249,7 @@
   ],
   "group": "other",
   "duty": 0.08,
-  "excluded": false,
+  "excluded": true,
   "ex": [
    30,
    80,
@@ -1266,7 +1266,7 @@
   ],
   "group": "other",
   "duty": 0.08,
-  "excluded": false,
+  "excluded": true,
   "ex": [
    30,
    80,
@@ -1301,7 +1301,7 @@
   ],
   "group": "other",
   "duty": 0.08,
-  "excluded": false,
+  "excluded": true,
   "ex": [
    30,
    80,

@@ -18,5 +18,5 @@
 </div>
 <h2>품목별 예상 세금</h2>
 <table class="tbl"><thead><tr><th>품목</th><th>통관</th><th>과세 시 세율</th><th></th></tr></thead>
-<tbody>{% for it in items %}<tr><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">{{ it.name }}</a></td><td>{{ '일반통관' if it.excluded else '목록통관' }}</td><td>{% if it.group == 'alcohol' %}관세 {{ it.duty|pct }} + 주세·교육세·부가세{% elif it.group == 'tobacco' %}별도 계산{% elif it.duty == 0 %}부가세 10%{% else %}관세 {{ it.duty|pct }} + 부가세{% if country.fta %} · FTA 시 10%{% endif %}{% endif %}</td><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">계산</a></td></tr>{% endfor %}</tbody></table>
+<tbody>{% for it in items %}<tr><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">{{ it.name }}</a></td><td>{{ '일반통관' if it.excluded else '목록통관' }}</td><td>{% if it.group == 'alcohol' %}관세 {{ it.duty|pct }} + 주세·교육세·부가세{% elif it.group == 'tobacco' %}별도 계산{% elif it.slug in rules.vat_exempt_items %}관세 0% · 부가세 면제{% elif it.duty == 0 %}부가세 10%{% else %}관세 {{ it.duty|pct }} + 부가세{% if country.fta %} · FTA 시 10%{% endif %}{% endif %}</td><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">계산</a></td></tr>{% endfor %}</tbody></table>
 {% endblock %}

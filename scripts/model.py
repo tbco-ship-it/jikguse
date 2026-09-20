@@ -25,11 +25,13 @@ def compute(item, country, price, shipping, fx, *, method=None, fta=False, couri
     price_krw = to_krw(price, cur, fx)
     ship_krw = to_krw(shipping, cur, fx)
     price_usd = to_usd(price, cur, fx)
+    # 면세 판정 금액 = 물품대금 + 발송국 내 운임·세금(현지 배송비). 국제운송비·보험료는 제외 (관세청 소액면세 기준).
+    threshold_usd = to_usd(price + shipping, cur, fx)
 
     excluded = item["excluded"]
     limit = RULES["exemption_usd_us_courier"] if (country["courier200"] and courier and not excluded) else RULES["exemption_usd"]
     clearance = "일반통관" if excluded else "목록통관"
-    exempt = price_usd <= limit
+    exempt = threshold_usd <= limit
     fta_ok = fta and country["fta"] and item["group"] != "tobacco"
     ict = RULES["consumption_tax"]
 
@@ -85,6 +87,7 @@ def compute(item, country, price, shipping, fx, *, method=None, fta=False, couri
         "partial_exempt": exempt and item["group"] == "alcohol",
         "limit_usd": limit,
         "price_usd": round(price_usd, 2),
+        "threshold_usd": round(threshold_usd, 2),
         "price_krw": round(price_krw),
         "ship_krw": round(ship_krw),
         "taxable_krw": round(taxable),

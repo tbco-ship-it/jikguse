@@ -43,7 +43,8 @@
 
   // ----- tax model (mirror of scripts/model.py) -----
   function compute(item, country, price, ship, fwd, fta, simplified) {
-    const cur = country.currency, priceK = price * FX[cur], shipK = ship * FX[cur], usd = priceK / FX.USD;
+    // 면세 판정 금액 = 물품가 + 현지 배송비 (국제운송비·보험료 제외) — 관세청 소액면세 기준
+    const cur = country.currency, priceK = price * FX[cur], shipK = ship * FX[cur], usd = (priceK + shipK) / FX.USD;
     const excluded = item.excluded;
     const limit = (country.courier200 && !excluded) ? R.exemption_usd_us_courier : R.exemption_usd;
     const under = usd <= limit;
@@ -129,12 +130,12 @@
     const cls = r.exempt ? 'balanced' : r.eff > 60 ? 'severe' : r.eff > 20 ? 'moderate' : 'mild';
     let title, text;
     if (r.method === 'unsupported') { title = '담배는 아직 계산하지 않습니다'; text = '관세 40%에 개별소비세·담배소비세·지방교육세가 개비·그램 단위로 붙어 별도 확인이 필요합니다.'; }
-    else if (r.partial) { title = `세금 ${won(r.tax)} · 관세·부가세만 면제`; text = `주류는 미화 ${r.limit}달러 이하(1병·1L 이하)면 관세와 부가세는 면제되지만 주세와 교육세는 그대로 붙습니다. 물품가 미화 ${r.usd.toFixed(0)}달러, 과세가격 ${won(r.taxable)}.`; }
-    else if (r.exempt) { title = `면세 — 세금 0원 · ${item.excluded ? '일반통관(소액면세)' : '목록통관'}`; text = `물품가 미화 ${r.usd.toFixed(0)}달러로 한도 ${r.limit}달러 이내입니다. 총비용은 물품가 ${won(r.priceK)} + 배송 ${won(r.shipK)}${fwd ? ' + 배대지 ' + won(fwd) : ''}.`; }
+    else if (r.partial) { title = `세금 ${won(r.tax)} · 관세·부가세만 면제`; text = `주류는 미화 ${r.limit}달러 이하(1병·1L 이하)면 관세와 부가세는 면제되지만 주세와 교육세는 그대로 붙습니다. 물품가+현지 배송비 미화 ${r.usd.toFixed(0)}달러, 과세가격 ${won(r.taxable)}.`; }
+    else if (r.exempt) { title = `면세 — 세금 0원 · ${item.excluded ? '일반통관(소액면세)' : '목록통관'}`; text = `물품가+현지 배송비 미화 ${r.usd.toFixed(0)}달러로 한도 ${r.limit}달러 이내입니다. 총비용은 물품가 ${won(r.priceK)} + 배송 ${won(r.shipK)}${fwd ? ' + 배대지 ' + won(fwd) : ''}.`; }
     else {
       title = `세금 ${won(r.tax)} (${r.eff.toFixed(1)}%) · ${item.excluded ? '일반통관' : '목록통관 한도 초과'}`;
       const over = r.usd - r.limit;
-      text = `물품가 미화 ${r.usd.toFixed(0)}달러로 한도 ${r.limit}달러를 ${over.toFixed(0)}달러 넘어 전체가 과세됩니다. 과세가격 ${won(r.taxable)}${r.ftaOk ? ' · FTA 적용으로 관세 0%' : ''}.`;
+      text = `물품가+현지 배송비 미화 ${r.usd.toFixed(0)}달러로 한도 ${r.limit}달러를 ${over.toFixed(0)}달러 넘어 전체가 과세됩니다. 과세가격 ${won(r.taxable)}${r.ftaOk ? ' · FTA 적용으로 관세 0%' : ''}.`;
     }
     const rows = r.lines.map(([n, v]) => `<tr><th>${n}</th><td>${won(v)}</td></tr>`).join('');
     let nearLimit = '';
