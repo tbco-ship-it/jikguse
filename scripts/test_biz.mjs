@@ -110,9 +110,9 @@ t('parseSheet: other forwarders — table with 개/$·¥ symbols, HS코드: 10-d
   assert.deepEqual([P.cur, P.totalKrw, P.exclKrw, P.co, P.mixed], ['USD', 320000, 70000, true, false]);
   P = BizCalc.parseSheet('품명: 낚시릴\nHS코드: 9507300000\n수량: 40\n가격: 28.5 USD\n\n품명: 낚싯대\nHS코드 950710\n수량 25\n가격 14 USD\n총 결제금액 150,000 KRW');
   assert.deepEqual(P.lines, [{ h6: '950730', qty: 40, price: 28.5 }, { h6: '950710', qty: 25, price: 14 }]); assert.equal(P.totalKrw, 150000);
-  P = BizCalc.parseSheet('Item 1 - HS 8714.99.00 - 350 pcs - Unit price 3.82 CNY\nItem 2 - HS 6307.10 - 3000 pcs - Unit price ¥0.14\n국제운임 210,000 원\n원산지증명서 발급 30,000원');
+  P = BizCalc.parseSheet('Item 1 - HS 8714.99.00 - 350 pcs - Unit price 3.82 CNY\nItem 2 - HS 6307.10 - 3000 pcs - Unit price ¥0.14\n국제운임 210,000 원\n원산지증명서 발급 30,000원\n원산지작업 40,000원');
   assert.deepEqual(P.lines, [{ h6: '871499', qty: 350, price: 3.82 }, { h6: '630710', qty: 3000, price: 0.14 }]);
-  assert.deepEqual([P.cur, P.origin, P.totalKrw, P.exclKrw, P.co], ['CNY', 'CN', 210000, 30000, true]);
+  assert.deepEqual([P.cur, P.origin, P.totalKrw, P.exclKrw, P.co], ['CNY', 'CN', 210000, 70000, true]);
   P = BizCalc.parseSheet('상품 1234.56 CNY 수량 3\n배송비 50,000원');
   assert.deepEqual([P.lines.length, P.totalKrw], [0, 50000]);
   assert.equal(BizCalc.parseSheet('HS 6204.43 수량 10 $5\nHS 9615.11 수량 10 ¥5').mixed, true);

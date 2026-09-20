@@ -116,7 +116,7 @@
   // Parse text copied from any forwarder's application page (신청서조회 / 결제정보 / 견적 화면). Items are located by an HS
   // code in any common notation ("[620453]", "HS 6204.53", "6204.53.0000", "HS코드 620453") and read the nearest
   // 수량/qty and 단가/price (currency code, symbol or 원·元·달러 word). Shipping = 총배송요금 / 배송비 / 배송요금 / 운임 / 결제금액;
-  // non-dutiable add-ons = 부가서비스·추가요금·통관대행·신고대행·서류작성·원산지증명·국내택배 amounts; C/O = a certificate line.
+  // non-dutiable add-ons = 부가서비스·추가요금·통관대행·신고대행·서류작성·원산지증명·원산지작업·국내택배 amounts; C/O = a certificate line.
   // Verified layouts: QuickStar (scripts/fixtures/quickstar_*.txt). Other forwarders share the vocabulary but not the layout.
   function parseSheet(text) {
     const t = String(text || '').replace(/\r/g, '').replace(/[\u00a0\t]+/g, ' ');
@@ -159,7 +159,7 @@
       if (ship) totalKrw = num(ship[1]);
       const blk = t.match(/부가서비스\[출고\]([\s\S]*?)(?:\n운송방법|$)/);
       if (blk) for (const mm of blk[1].matchAll(/\)\s+([\d,]+)\s*(?:\n|$)/g)) exclKrw += num(mm[1]);
-      else for (const mm of t.matchAll(new RegExp('(?:통관\\s*대행(?:료|비)?|신고\\s*대행(?:료|비)?|서류\\s*작성(?:비)?|원산지\\s*증명서?(?:\\s*발급)?(?:비|료)?|C/O(?:\\s*발급)?|국내\\s*(?:택배|배송)(?:비|료)?)\\s*[:：]?\\s*' + krw, 'gi'))) exclKrw += num(mm[1]);
+      else for (const mm of t.matchAll(new RegExp('(?:통관\\s*대행(?:료|비)?|신고\\s*대행(?:료|비)?|서류\\s*작성(?:비)?|원산지\\s*증명서?(?:\\s*발급)?(?:비|료)?|원산지\\s*작업(?:비|료)?|C/O(?:\\s*발급)?|국내\\s*(?:택배|배송)(?:비|료)?)\\s*[:：]?\\s*' + krw, 'gi'))) exclKrw += num(mm[1]);
     }
     if (exclKrw > totalKrw) exclKrw = 0; // add-ons read from somewhere that isn't the shipping bill — don't trust them
     const co = /\d\s*원산지증명서|원산지증명서 발급\([^)]*\)\s+[\d,]+\s*(?:\n|$)|(?:원산지\s*증명서?|C\/O)\s*(?:발급|있음|신청|포함|O|Y|✓)/i.test(t);
