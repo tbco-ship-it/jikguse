@@ -22,8 +22,10 @@ jobs:
           python-version: "3.12"
       - run: pip install jinja2
       - name: Refresh weekly customs FX
+        env:
+          DATAGO_FX_KEY: ${{ secrets.DATAGO_FX_KEY }}
         run: |
-          # UNIPASS sometimes refuses non-Korean IPs; never let a fetch failure block the deploy.
+          # data.go.kr API first (works from runners), UNIPASS fallback; never let a fetch failure block the deploy.
           python scripts/fetch_fx.py || echo "fx fetch failed; keeping committed data/fx.json"
           if ! git diff --quiet data/fx.json; then
             git config user.name "fx-bot" && git config user.email "fx-bot@users.noreply.github.com"
