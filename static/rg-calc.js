@@ -45,6 +45,14 @@
     return { i, name: SIZES[i].name, cm: Math.round(cm * 10) / 10, kg, extra };
   }
 
+  // 사이즈 유형만 고른 경우(치수를 모를 때)의 대표 치수: 유형 구간(이전 유형 상한~이 유형 상한)의 중간 세변합을 정육면체로, 무게도 구간 중간값.
+  // 보관비(부피)와 묶음 유형 추정에만 쓰인다; 입출고·배송비는 유형으로 정해지므로 대표값과 무관.
+  function tierDims(i) {
+    const lo = i > 0 ? SIZES[i - 1] : { cm: 0, kg: 0 }, hi = SIZES[i];
+    const side = Math.round((lo.cm + hi.cm) / 2 / 3 * 10);
+    return { dims: [side, side, side], wt: Math.round((lo.kg + hi.kg) / 2 * 1000) };
+  }
+
   // fee table lookup: t = { bands:[...], wh:[6][n], sh:[6][n], base_wh:[6], base_sh:[6] }
   const lookup = (t, kind, sizeIdx, price) => t[kind][sizeIdx][band(t.bands, price)];
 
@@ -126,5 +134,5 @@
   }
   const isApparel = path => APPAREL_ROOTS.includes(String(path || '').split('>')[0]);
 
-  root.RgCalc = { SIZES, STORAGE_TIERS, RETURN_PICKUP, RESTOCK, REMOVAL, FREE_RETURNS, SAVER, RETURN_DEFAULTS, sizeTier, lookup, storageCost, compute, breakEven, bundleDims, returnDefault, isApparel, band };
+  root.RgCalc = { SIZES, STORAGE_TIERS, RETURN_PICKUP, RESTOCK, REMOVAL, FREE_RETURNS, SAVER, RETURN_DEFAULTS, sizeTier, tierDims, lookup, storageCost, compute, breakEven, bundleDims, returnDefault, isApparel, band };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -22,6 +22,12 @@ t('size tier needs both 세변합 and 무게; beyond 특대형 adds max(90cm당,
   assert.equal(RgCalc.sizeTier([200, 150, 50], 3000).name, '소형');         // 40cm but 3kg → 소형 (weight binds)
   assert.equal(RgCalc.sizeTier([800, 300, 200], 1000).name, '대형1');       // 130cm > 120 → 대형1
 });
+t('tierDims: representative dims of a tier land in that tier; 2-bundles of 극소형/소형 stay ≤ 소형', () => {
+  RgCalc.SIZES.forEach((sz, i) => { const d = RgCalc.tierDims(i); assert.equal(RgCalc.sizeTier(d.dims, d.wt).name, sz.name); });
+  assert.deepEqual(RgCalc.tierDims(0), { dims: [133, 133, 133], wt: 1000 });           // (0+80)/2 = 40cm 세변합 → 13.3cm cube, 1kg
+  assert.equal(RgCalc.sizeTier(RgCalc.bundleDims(RgCalc.tierDims(0).dims, 2), 2000).name, '극소형');
+  assert.equal(RgCalc.sizeTier(RgCalc.bundleDims(RgCalc.tierDims(1).dims, 2), 7000).name, '중형');
+});
 t('size tier boundaries (≤ inclusive)', () => {
   assert.equal(RgCalc.sizeTier([500, 200, 100], 2000).name, '극소형');      // exactly 80cm, 2kg
   assert.equal(RgCalc.sizeTier([500, 200, 101], 2000).name, '소형');

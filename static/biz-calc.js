@@ -83,7 +83,7 @@
       const rt = rateFor(l.entry, input.cols, input.origin, input.co);
       const duty = floor10(cif * rt.applied.rate / 100);
       const vat = floor10((cif + duty) * 0.1);
-      return { entry: l.entry, qty: l.qty, price: l.price, goodsKrw: Math.floor(goods[i]), cif, rate: rt, duty, vat, specific: !!l.entry.u, req: !!l.entry.q };
+      return { entry: l.entry, name: l.name || '', qty: l.qty, price: l.price, goodsKrw: Math.floor(goods[i]), cif, rate: rt, duty, vat, specific: !!l.entry.u, req: !!l.entry.q };
     });
     const sum = k => out.reduce((s, x) => s + x[k], 0);
     const duty = sum('duty'), vat = sum('vat');
@@ -128,10 +128,24 @@
     let m;
     while ((m = hsRe.exec(t))) {
       const h6 = m[1] || (m[2] ? m[2] + m[3] : m[4] + m[5]);
-      if (!marks.length || marks[marks.length - 1].at !== m.index) marks.push({ h6, at: m.index });
+      if (!marks.length || marks[marks.length - 1].at !== m.index) marks.push({ h6, at: m.index, len: m[0].length });
     }
     const lines = [];
     let cur = null, mixed = false; // mixed: lines quoted in more than one currency — caller should warn
+    // Item name as the seller typed it (feeds the 로켓그로스 category match): the rest of the HS line ("[630710] 안경닦이 · Cleansing
+    // glasses · 眼镜擦儿" → 안경닦이), else a 상품명/품명 label just above, else the text before the code on a table row. Hangul first.
+    const hasKo = s => /[가-힣]/.test(s);
+    const clean = s => String(s || '').replace(/^[\s:：·|\-–—/]+|[\s:：·|\-–—/]+$/g, '').replace(/\s+/g, ' ').slice(0, 60);
+    const nameNear = (at, len) => {
+      const ls = t.lastIndexOf('\n', at) + 1, le = (t.indexOf('\n', at) + 1 || t.length + 1) - 1;
+      const noise = x => !x || /^[\d.,]/.test(x) || /^(?:HS|품목|품명|상품명)$/i.test(x) || (/\d/.test(x) && (/(?:개|pcs|ea|qty|수량|price|단가)/i.test(x) || /[A-Z]{3}|[¥￥$＄€£]/.test(x)));
+      const after = t.slice(at + len, le).split(/\s[·|/\-–]\s|[·|]/).map(clean).filter(x => !noise(x));
+      const before = t.slice(ls, at).split(/\s[·|/\-–]\s|[·|]/).map(clean).filter(x => !noise(x));
+      const lm = t.slice(Math.max(0, ls - 300), ls).match(/(?:상품명|품명|품목명|제품명|item\s*name)\s*[:：]?\s*([^\n]+)\n[^\n]*$/i);
+      const label = lm ? clean(lm[1].split(/\s[·|/\-–]\s|[·|]/)[0]) : '';
+      const cands = [...after, ...before, label].filter(x => !noise(x));
+      return cands.find(hasKo) || cands[0] || '';
+    };
     marks.forEach((p, i) => {
       const seg = t.slice(p.at, marks[i + 1] ? marks[i + 1].at : p.at + 800);
       const pm = seg.match(new RegExp('(?:단가|unit\\s*price|price|가격|금액)\\s*[:：]?\\s*([¥￥$＄€£]?)\\s*([\\d,]+(?:\\.\\d+)?)\\s*(' + CODE + ')?', 'i'))
@@ -143,7 +157,7 @@
       const c = pm[3] ? (SYM[pm[3]] || pm[3].toUpperCase()) : (SYM[pm[1]] || null);
       if (c && c !== 'KRW') { cur = cur || c; if (c !== cur) mixed = true; }
       const dup = lines.find(l => l.h6 === p.h6 && l.price === price);
-      if (dup) dup.qty += qty; else lines.push({ h6: p.h6, qty, price });
+      if (dup) dup.qty += qty; else lines.push({ h6: p.h6, qty, price, name: nameNear(p.at, p.len) });
     });
     if (!cur) { const dm = t.match(new RegExp('(?:총구매비|해외구매비|상품금액|물품가|구매금액)\\s*[:：]?\\s*([¥￥$＄€£]?)\\s*[\\d,]+(?:\\.\\d+)?\\s*(' + CODE + ')?')); if (dm) cur = dm[2] ? (SYM[dm[2]] || dm[2].toUpperCase()) : (SYM[dm[1]] || null); if (cur === 'KRW') cur = null; }
     const goods = lines.reduce((s, l) => s + l.qty * l.price, 0);
