@@ -152,6 +152,16 @@
   syncFrcur();
   ['total', 'excl', 'ins'].forEach(id => $(id).addEventListener('input', render));
   $('co').addEventListener('change', rerender);
+  // 초기화: 저장된 입력을 지우고 빈 계산기로 (페이지를 오가도 마지막 입력이 남는 게 기본이라 따로 둔다)
+  $('reset').addEventListener('click', () => {
+    localStorage.removeItem(KEY);
+    lines.length = 0; lines.push({ hs: '', qty: '', price: '', entry: null });
+    ['total', 'excl', 'ins', 'paste-text'].forEach(id => { $(id).value = ''; });
+    $('co').checked = false; $('frcur').value = 'KRW'; syncFrcur();
+    $('paste-note').textContent = ''; $('bm-note').textContent = '';
+    mountAll(); rerender();
+    const first = linesEl.querySelector('input'); if (first) first.focus();
+  });
 
   // ----- paste a forwarder's application page -----
   $('paste-toggle').addEventListener('click', () => {
