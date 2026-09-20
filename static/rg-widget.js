@@ -38,6 +38,7 @@
       <span class="money"><span class="unit">원</span><input data-f="cost" class="num-in" type="text" inputmode="numeric" placeholder="6000" autocomplete="off"></span>
     </label>
   </div>
+  <p class="muted small rg-price-note" hidden></p>
   <p class="muted small rg-cost-note">${o.embedded ? '' : `수입품이면 <a href="${o.base}business/">사업자 수입 계산기</a>에서 배대지 신청서를 붙여 넣고 [로켓그로스 수익도 같이 보기]를 누르면 관세·운임까지 포함한 개당 원가가 그대로 들어옵니다.`}</p>
   <div class="size-block">
   <h3 class="sub-h">사이즈 유형 <small class="muted">(판매 단위 1개, 포장 포함 · 쿠팡이 입출고·배송비를 매기는 6단계)</small></h3>
@@ -119,13 +120,13 @@
     const q = s => host.querySelector(s);
     const F = {}; FIELDS.forEach(f => { F[f] = q(`[data-f="${f}"]`); });
     const out = q('.rg-result'), catInput = q('.rg-cat'), menu = q(`#${id}-menu`), saver = q('.rg-saver'), simp = q('.rg-simp');
-    const catNote = q('.rg-cat-note'), sizeNote = q('.rg-size-note'), costNote = q('.rg-cost-note');
+    const catNote = q('.rg-cat-note'), sizeNote = q('.rg-size-note'), costNote = q('.rg-cost-note'), priceNote = q('.rg-price-note');
     const catField = q('.cat-field'), priceField = q('.price-field'), sizeBlock = q('.size-block'), tiers = q('.tiers'), dimsRow = q('.row.dims'), dimsToggle = q('.rg-dims-toggle');
     const costNoteOrig = costNote.innerHTML;
     const wingIn = q('.rg-wing-in'), wingGo = q('.rg-wing-go'), wingNote = q('.rg-wing-note'), wingClear = q('.rg-wing-clear'), wingOpts = q('.rg-wing-opts'), wingOut = q('.rg-wing-out');
     const WF = { lead: q('[data-w="lead"]'), cover: q('[data-w="cover"]') };
     let W = null; // parsed Wing row (RgWing.parse().w) for the current slot
-    let KEY = o.key, cat = null, catAuto = false, BP = {}, retTouched = false, ctx = {};
+    let KEY = o.key, cat = null, catAuto = false, BP = {}, retTouched = false, discTouched = false, ctx = {};
     let sizeMode = 'tier', tierIdx = null; // 'tier' = picked a 쿠팡 유형 (default) · 'dims' = typed mm/g
     let lastNum = null; // last headline number, to pulse the sheet when an input changes it
     let CATS = null;
@@ -202,6 +203,7 @@
     // ----- inputs / state -----
     for (const f of FIELDS) F[f].addEventListener('input', render);
     F.ret.addEventListener('input', () => { retTouched = true; });
+    F.disc.addEventListener('input', () => { discTouched = true; });
     saver.addEventListener('change', render); simp.addEventListener('change', render);
     q('.rg-reset').addEventListener('click', () => { reset(); catInput.focus(); });
     WF.lead.addEventListener('input', render); WF.cover.addEventListener('input', render);
@@ -227,6 +229,9 @@
       const wg = s.wing || {}; wingIn.value = wg.text || ''; WF.lead.value = wg.lead || '25'; WF.cover.value = wg.cover || '30';
       W = wg.text && root.RgWing ? (r => r.ok ? r.w : null)(root.RgWing.parse(wg.text)) : null; wingNote.textContent = '';
       for (const f of FIELDS) F[f].value = s[f] != null && s[f] !== '' ? s[f] : (DEFAULTS[f] || '');
+      // 2026-09-20 이전 버전이 윙 붙여넣기(25%)·'실판매가로 다시 계산'(42.5%)으로 넣어 둔 할인 — 사용자가 직접 친 값(discTouched)이 아니면 지운다 (오너: 판매가는 낱개 칸 값 그대로)
+      discTouched = !!s.discTouched;
+      if (!discTouched && numv(F.disc.value) > 0 && wg.text) F.disc.value = DEFAULTS.disc;
       tierIdx = Number.isInteger(s.tierIdx) && RgCalc.SIZES[s.tierIdx] ? s.tierIdx : null;
       sizeMode = s.sizeMode === 'dims' || (!s.sizeMode && ['d1', 'd2', 'd3', 'wt'].some(f => F[f].value)) ? 'dims' : 'tier'; // pre-toggle saves had dims only
       showDims(sizeMode === 'dims');
@@ -261,7 +266,7 @@
     }
 
     function state() {
-      const s = { cat, catAuto, bp: BP, saver: saver.checked, simp: simp.checked, retTouched, sizeMode, tierIdx, wing: { text: wingIn.value, lead: WF.lead.value, cover: WF.cover.value } };
+      const s = { cat, catAuto, bp: BP, saver: saver.checked, simp: simp.checked, retTouched, discTouched, sizeMode, tierIdx, wing: { text: wingIn.value, lead: WF.lead.value, cover: WF.cover.value } };
       for (const f of FIELDS) s[f] = F[f].value;
       return s;
     }
@@ -291,6 +296,8 @@
       sizeNote.textContent = !I.tier ? SIZE_HELP
         : sizeMode === 'dims' ? `사이즈 유형: ${I.tier.name} — 세변 합 ${I.tier.cm}cm · ${I.wt.toLocaleString('ko-KR')}g · 부피 ${(I.cbm * 1000).toFixed(2)}ℓ(${I.cbm.toFixed(4)}㎥)${I.tier.extra ? ` · 특대형 초과 추가비용 ${won(I.tier.extra)}` : ''}`
         : `${I.tier.name}: 세변 합 ${RgCalc.SIZES[I.tier.i].cm}cm · ${RgCalc.SIZES[I.tier.i].kg}kg까지.${ev.ok ? ` 이 유형·판매가 구간의 물류비 = 입출고 ${won(ev.c.wh)} + 배송 ${won(ev.c.sh)}.` : ' 입출고·배송비는 유형으로 정해지고,'} 보관비와 묶음 유형은 이 유형의 대표 크기(${I.dims.join('×')}mm · ${(I.wt / 1000).toLocaleString('ko-KR')}kg)로 어림합니다.`;
+      priceNote.hidden = !(I.price > 0 && I.sellerDisc > 0);
+      if (!priceNote.hidden) priceNote.textContent = `판매자 즉시할인 ${I.sellerDisc}% 적용 → 수수료·정산 기준가 ${won(I.price * (1 - I.sellerDisc / 100))} (아래 '판매 조건 자세히'의 판매자 즉시할인 칸 · 0으로 두면 판매가 그대로)`;
       catNote.textContent = cat ? `${catAuto && ctx.query ? `신청서 품명 '${ctx.query}' → 자동 매칭 · 다르면 위 칸에서 바꾸세요 · ` : ''}${cat.p.replace(/>/g, ' › ')} · 판매수수료 ${cat.r}% (VAT 별도)${unitOf(cat).lowasp ? ' · 14,000원 미만 저가 상품 전용 할인 대상' : ''}${RgCalc.isApparel(cat.p) ? ' · 45일 무료 보관·의류 회수비 단가' : ''}`
         : ctx.query && catInput.value === ctx.query ? `신청서 품명 '${ctx.query}'에 딱 맞는 쿠팡 카테고리가 없어요 — 상품 종류를 다른 말로 적어 골라 주세요(예: 청소포, 안경 액세서리).` : CAT_HELP;
       // what the seller still has to type is marked; placeholders talk until then
@@ -309,7 +316,7 @@
       const tone = c.expected <= 0 ? 'severe' : c.margin < 0.1 ? 'moderate' : 'balanced';
       const retLine = c.returns.r > 0 ? `반품 ${pct1(c.returns.r)} 반영: 반품 1건당 ${won(c.returns.perReturn)}(회수 ${won(c.returns.pickup)} + 재입고 ${won((1 - c.returns.q) * c.returns.restock)} + 재판매 불가 ${pct1(c.returns.q)}분 원가·반출비 ${won(c.returns.cogsLoss + c.returns.removal)})${c.billable < 1 && !I.saver ? ` · 월 20건 무료라 ${pct1(1 - c.billable)}는 무료` : ''}${I.saver ? ' · 세이버로 회수·재입고비 0' : ''}` : '반품률 0% — 반품 비용 없음';
       const rows = [
-        ['매출 (공급가)', c.revenue, I.simplified ? '판매가 − 간이과세 부가세 약 1%' : `판매가 ${won(c.sold)} ÷ 1.1`],
+        ['매출 (공급가)', c.revenue, `${I.sellerDisc > 0 ? `판매가 ${won(I.price)} − 즉시할인 ${I.sellerDisc}% = ${won(c.sold)}` : `판매가 ${won(c.sold)}`}${I.simplified ? ' − 간이과세 부가세 약 1%' : ' ÷ 1.1'}`],
         ['판매수수료', -c.commission, `${cat.r}% × ${won(c.sold)}`],
         ['입출고비', -c.wh, `${I.tier.name} · ${bandLabel(unitOf(cat).bands, c.sold)}${I.tier.extra ? ' + 추가 ' + won(I.tier.extra) : ''}`],
         ['배송비', -c.sh, '주문당 1회'],
