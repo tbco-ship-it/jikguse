@@ -301,6 +301,8 @@
   function renderTotal() {
     if (!rgItems.length || !rgFees) { rgTotal.hidden = true; return; }
     const rows = rgItems.map(it => ({ it, ev: evalItem(it) }));
+    // chip status follows every widget change (typing a price, applying the Wing real price) — not only chip clicks
+    rows.forEach(({ it, ev }) => { const b = rgChips.querySelector(`.chip[data-id="${CSS.escape(it.id)}"]`); if (!b) return; b.classList.toggle('done', ev.ok); b.querySelector('small').innerHTML = `개당 ${won(it.cost)}${ev.ok ? ` → 순이익 <b class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected)}</b>` : ' · 입력 전'}`; });
     const done = rows.filter(r => r.ev.ok), todo = rows.length - done.length;
     const sum = f => done.reduce((s, r) => s + f(r), 0);
     const profit = sum(r => r.ev.c.expected * r.it.qty), revenue = sum(r => r.ev.c.sold * r.it.qty), outlayDone = sum(r => r.it.cost * r.it.qty), back = sum(r => (r.it.cost + r.ev.c.expected) * r.it.qty);

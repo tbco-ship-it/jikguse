@@ -689,3 +689,9 @@ html.landing .below{display:none}
 @media(prefers-color-scheme:dark){.tier{background:var(--surface);border-color:var(--line)}.tier.on{background:rgba(49,130,246,.18)}.calc-grid .field.need .money,.calc-grid .field.need .num-in.rg-cat,.size-block.need .tiers{background:rgba(49,130,246,.12)}}
 @media(max-width:560px){.rg-panel{padding:16px 12px 4px}}
 @media(prefers-color-scheme:dark){.rg-panel{background:var(--surface-2)}.rg-panel .calc-grid .card,.chip{background:var(--surface)}.chip.on{background:rgba(49,130,246,.18)}}
+/* 윙 실적 진단: paste card under the 로켓그로스 result, "윙 실적" badge on fields filled from the pasted row */
+.rg-wing{margin-top:16px}.calc-grid .rg-wing{grid-column:1/-1}.rg-wing .paste{margin-top:4px}.rg-wing .paste textarea{min-height:88px}.rg-wing>.muted{margin:0 0 10px;max-width:70ch}.rg-wing .card-title{margin-bottom:6px}
+.calc .row.rg-wing-opts{margin-top:14px}.calc .row.rg-wing-opts[hidden]{display:none}
+.rg-wing-out{margin-top:8px}.rg-wing-out:empty{display:none}.rg-wing-out .sheet{margin-top:12px}.rg-wing-out .sheet-title{margin-top:.4em}.rg-wing-out .tbl.mini th{width:auto;text-align:left}.rg-wing-out .tbl.mini td{white-space:nowrap;font-weight:700;vertical-align:top;padding-left:12px}
+.rg-wing-out .sheet-actions .next.alt{white-space:normal;height:auto;min-height:48px;padding:12px 18px;line-height:1.3}
+.field.wing>span:first-child::after{content:"윙 실적";display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:var(--green);color:#fff;font-size:.72rem;font-weight:800;letter-spacing:.02em;vertical-align:2px}
