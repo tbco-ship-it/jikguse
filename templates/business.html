@@ -24,14 +24,14 @@
   <h3 class="sub-h">품목</h3>
   <div class="import">
     <div class="import-text">
-      <b>퀵스타 신청서 그대로 가져오기</b>
-      <span class="muted small">① 파란 [직구세로 보내기] 버튼을 <b>클릭 말고</b> 크롬 위쪽 북마크바로 끌어다 놓기(한 번만, 북마크바가 안 보이면 ⌘⇧B) → ② 퀵스타 <b>신청서조회</b> 화면에서 그 북마크 누르기. 품목·배송비·부가서비스·C/O가 채워진 채로 이 페이지가 열립니다. 확장 프로그램 설치 아님.</span>
+      <b>배대지 신청서 그대로 가져오기</b>
+      <span class="muted small">어느 배대지든 신청서(품목·HS코드·수량·단가가 보이는 화면)를 통째로 복사해 [붙여넣기로 하기]에 넣으면 품목·배송비·C/O까지 채워집니다. 더 빠르게: 파란 [직구세로 보내기]를 <b>클릭 말고</b> 크롬 위쪽 북마크바로 끌어다 놓고(한 번만, 북마크바가 안 보이면 ⌘⇧B) 배대지 신청서 화면에서 그 북마크를 누르세요. 확장 프로그램 설치 아님.</span>
       <span class="muted small" id="bm-note" aria-live="polite"></span>
     </div>
     <div class="import-actions"><a id="bm" class="bm" href="#" draggable="true" title="북마크바로 끌어다 놓으세요">직구세로 보내기</a><button type="button" class="link-btn" id="paste-toggle" aria-expanded="false" aria-controls="paste">붙여넣기로 하기</button></div>
   </div>
   <div id="paste" class="paste" hidden>
-    <textarea id="paste-text" rows="5" placeholder="배대지(퀵스타 등) '신청서조회' 화면을 전체 선택(⌘/Ctrl+A)·복사해서 붙여 넣으세요. [결제정보] 화면도 이어 붙이면 운임 나누기와 C/O 여부까지 채워집니다."></textarea>
+    <textarea id="paste-text" rows="5" placeholder="배대지 신청서 화면(품목·HS코드·수량·단가가 보이는 곳)을 전체 선택(⌘/Ctrl+A)·복사해서 붙여 넣으세요. 결제·견적 화면도 이어 붙이면 배송비 나누기와 C/O 여부까지 채워집니다."></textarea>
     <div class="paste-actions"><button type="button" class="next" id="paste-fill">품목·운임 채우기</button><span class="muted small" id="paste-note"></span></div>
   </div>
   <div id="lines" data-hs="{{ base }}static/hs.json?v={{ hv }}" data-req="{{ base }}static/hs_req.json?v={{ hv }}"></div>
@@ -45,7 +45,7 @@
       <span class="money"><span class="unit" id="frcur2">KRW</span><input id="excl" class="num-in" type="text" inputmode="decimal" placeholder="90000" autocomplete="off"></span>
     </label>
   </div>
-  <p class="muted small fr-note" id="fr-note">과세가격에는 한국 도착까지의 운임·보험만 들어갑니다. 청구액에서 부가서비스를 뺀 나머지를 운임으로 씁니다. 퀵스타는 [결제정보]의 부가서비스·추가요금 합계가 과세 제외분입니다.</p>
+  <p class="muted small fr-note" id="fr-note">과세가격에는 한국 도착까지의 운임·보험만 들어갑니다. 청구액에서 부가서비스를 뺀 나머지를 운임으로 씁니다. 통관·신고대행, 서류작성, C/O 발급·원산지작업, 국내택배처럼 배대지가 따로 청구하는 항목 합계가 과세 제외분입니다.</p>
   <details class="more"><summary>보험료 따로 있음</summary>
     <label class="field">보험료
       <span class="money"><span class="unit" id="frcur3">KRW</span><input id="ins" class="num-in" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></span>
@@ -55,6 +55,12 @@
   <p class="muted small">예상치입니다. 품목분류(HS)와 신고 세액의 책임은 신고인에게 있습니다. <a href="{{ base }}methodology/#business">계산 방법 보기</a></p>
 </div>
 <div id="result" class="result" aria-live="polite"></div>
+<div id="rg-panel" class="rg-panel" hidden>
+  <div class="sub-row"><h2 class="card-title">이 물건, 로켓그로스로 팔면 얼마 남나</h2><button type="button" class="link-btn" id="rg-close">접기</button></div>
+  <p class="muted small">품목을 고르면 위 계산의 개당 원가(물품가 + 관세 + 운임·부가서비스 안분, 부가세 제외)가 매입원가로 들어갑니다. 카테고리·판매가·포장 크기만 넣으세요. 품목별 입력은 각각 기억합니다.</p>
+  <div class="chips" id="rg-chips" role="tablist" aria-label="품목 선택"></div>
+  <div class="calc-grid biz-grid rg-embed" id="rg-host" data-fees="{{ base }}static/rg_fees.json?v={{ rv }}" data-cats="{{ base }}static/rg_cats.json?v={{ rv }}"></div>
+</div>
 </section>
 
 <div class="ad-slot"><!-- ad: business_below --></div>
@@ -70,5 +76,7 @@
   <p>전기·전자제품(전파법·전기용품안전관리법), 어린이제품, 식품, 화장품 등은 관세법 제226조에 따라 수입신고 전에 요건승인기관의 확인이 필요합니다. 해당 품목을 고르면 관계 법령과 요건 문구를 결과 아래에 그대로 보여 드립니다. KC 인증 같은 국내 유통 의무는 세관장확인과 별개로 따로 확인하세요.</p>
 </section>
 <script src="{{ base }}static/biz-calc.js?v={{ v }}" defer></script>
+<script src="{{ base }}static/rg-calc.js?v={{ v }}" defer></script>
+<script src="{{ base }}static/rg-widget.js?v={{ v }}" defer></script>
 <script src="{{ base }}static/biz.js?v={{ v }}" defer></script>
 {% endblock %}

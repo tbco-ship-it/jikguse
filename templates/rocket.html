@@ -10,56 +10,7 @@
   <p>쿠팡 로켓그로스 판매자용. 카테고리별 판매수수료와 사이즈·판매가 구간별 입출고비·배송비, 보관비, 반품 회수·재입고비, 광고비까지 빼고 <strong>개당 순이익·마진율·ROI·손익분기 판매가</strong>를 보여 줍니다. 낱개와 2·3·4묶음도 한 줄씩 비교합니다. 요금표는 쿠팡 판매자센터 기준({{ rg.asof }}, 프로모션 {{ rg.promo_until }}까지).</p>
 </section>
 
-<section class="calc-grid biz-grid">
-<div class="calc card" id="rg">
-  <div class="sub-row"><h2 class="card-title">상품 정보</h2><button type="button" class="link-btn" id="reset" title="입력을 모두 지우고 새로 시작">초기화</button></div>
-  <label class="field cat-field"><span>카테고리 <small class="muted">(쿠팡 윙 상품등록과 같은 분류 · 판매수수료 자동)</small></span>
-    <input id="cat" class="num-in" type="text" placeholder="예: 골프 티셔츠, 스킨/토너, 강아지 사료" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="cat-menu" aria-autocomplete="list" data-src="{{ base }}static/rg_cats.json?v={{ rv }}">
-    <ul id="cat-menu" class="menu" role="listbox" hidden></ul>
-    <p class="muted small" id="cat-note">카테고리를 고르면 판매수수료율과 입출고·배송 요금 그룹이 정해집니다.</p>
-  </label>
-  <div class="row">
-    <label class="field"><span>판매가 <small class="muted">(소비자가, VAT 포함)</small></span>
-      <span class="money"><span class="unit">원</span><input id="price" class="num-in" type="text" inputmode="numeric" placeholder="19900" autocomplete="off"></span>
-    </label>
-    <label class="field"><span>매입원가 <small class="muted">(개당, VAT 제외)</small></span>
-      <span class="money"><span class="unit">원</span><input id="cost" class="num-in" type="text" inputmode="numeric" placeholder="6000" autocomplete="off"></span>
-    </label>
-  </div>
-  <p class="muted small" id="cost-note">수입품이면 <a href="{{ base }}business/">사업자 수입 계산기</a> 결과의 품목 줄에서 [로켓그로스 수익 보기]를 누르면 관세·운임까지 포함한 개당 원가가 그대로 들어옵니다.</p>
-  <h3 class="sub-h">포장 크기 <small class="muted">(판매 단위 1개, 포장 포함)</small></h3>
-  <div class="row dims">
-    <label class="field"><span>가로 <small class="muted">mm</small></span><input id="d1" class="num-in" type="text" inputmode="numeric" placeholder="200" autocomplete="off"></label>
-    <label class="field"><span>세로 <small class="muted">mm</small></span><input id="d2" class="num-in" type="text" inputmode="numeric" placeholder="150" autocomplete="off"></label>
-    <label class="field"><span>높이 <small class="muted">mm</small></span><input id="d3" class="num-in" type="text" inputmode="numeric" placeholder="50" autocomplete="off"></label>
-    <label class="field"><span>무게 <small class="muted">g</small></span><input id="wt" class="num-in" type="text" inputmode="numeric" placeholder="300" autocomplete="off"></label>
-  </div>
-  <p class="muted small" id="size-note">세변 합과 무게 둘 다 기준 안이어야 그 사이즈입니다. 극소형 80cm·2kg → 소형 100cm·5kg → 중형 120cm·10kg → 대형1 140cm·15kg → 대형2 160cm·20kg → 특대형 250cm·30kg.</p>
-  <details class="more" id="more"><summary>판매 조건 자세히 (판매기간·반품률·광고·세이버)</summary>
-    <div class="row">
-      <label class="field"><span>예상 판매기간 <small class="muted">(입고 후 다 팔릴 때까지, 일)</small></span><input id="turn" class="num-in" type="text" inputmode="numeric" value="60" autocomplete="off"></label>
-      <label class="field"><span>월 판매량 <small class="muted">(개 · 반품 무료 20건·세이버 안분용)</small></span><input id="monthly" class="num-in" type="text" inputmode="numeric" value="100" autocomplete="off"></label>
-    </div>
-    <div class="row">
-      <label class="field"><span>반품률 <small class="muted">(% · 쿠팡 미공개, 카테고리 기본값)</small></span><input id="ret" class="num-in" type="text" inputmode="decimal" placeholder="5" autocomplete="off"></label>
-      <label class="field"><span>반품 중 재판매 불가 <small class="muted">(% · 원가 손실 + 반출비)</small></span><input id="unsell" class="num-in" type="text" inputmode="decimal" value="20" autocomplete="off"></label>
-    </div>
-    <div class="row">
-      <label class="field"><span>광고비 <small class="muted">(매출 대비 %, VAT 별도)</small></span><input id="ad" class="num-in" type="text" inputmode="decimal" value="0" autocomplete="off"></label>
-      <label class="field"><span>판매자 즉시할인 <small class="muted">(% · 수수료·정산 기준가에 반영)</small></span><input id="disc" class="num-in" type="text" inputmode="decimal" value="0" autocomplete="off"></label>
-    </div>
-    <div class="row">
-      <label class="field"><span>입고 운송비 등 <small class="muted">(개당 · 물류센터까지 택배비, 바코드·포장 등, VAT 별도)</small></span><input id="inbound" class="num-in" type="text" inputmode="numeric" value="0" autocomplete="off"></label>
-    </div>
-    <div class="row">
-      <label class="check"><input id="saver" type="checkbox"> <span>로켓그로스 세이버 가입 (월 99,000원 · 반품비 무제한 무료 · 60일 무료 보관)</span></label>
-      <label class="check"><input id="simp" type="checkbox"> <span>간이과세자 (매입세액공제 없음)</span></label>
-    </div>
-  </details>
-  <p class="muted small">예상치입니다. 실제 청구는 윙 &gt; 정산 &gt; 로켓그로스 정산현황 기준이며, 프로모션·요율은 바뀔 수 있습니다. <a href="{{ base }}methodology/#rocket">계산 방법 보기</a></p>
-</div>
-<div id="result" class="result" aria-live="polite"></div>
-</section>
+<section class="calc-grid biz-grid" id="rg-host" data-fees="{{ base }}static/rg_fees.json?v={{ rv }}" data-cats="{{ base }}static/rg_cats.json?v={{ rv }}" data-base="{{ base }}"></section>
 
 <div class="ad-slot"><!-- ad: rocket_below --></div>
 
@@ -74,5 +25,6 @@
   <p>월정산은 월 판매마감일 + 20영업일에 100%, 주정산은 주 마감일 + 20영업일에 70%, 나머지 30%는 해당 월 익익월 첫 영업일에 들어옵니다. 세이버 가입자는 매월 500만원까지 수수료 없이 다음 날 90%를 받는 빠른정산을 쓸 수 있습니다.</p>
 </section>
 <script src="{{ base }}static/rg-calc.js?v={{ v }}" defer></script>
-<script src="{{ base }}static/rg.js?v={{ v }}" defer data-fees="{{ base }}static/rg_fees.json?v={{ rv }}"></script>
+<script src="{{ base }}static/rg-widget.js?v={{ v }}" defer></script>
+<script src="{{ base }}static/rg.js?v={{ v }}" defer></script>
 {% endblock %}

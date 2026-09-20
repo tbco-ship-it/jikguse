@@ -159,6 +159,7 @@
     ['total', 'excl', 'ins', 'paste-text'].forEach(id => { $(id).value = ''; });
     $('co').checked = false; $('frcur').value = 'KRW'; syncFrcur();
     $('paste-note').textContent = ''; $('bm-note').textContent = '';
+    $('rg-panel').hidden = true;
     mountAll(); rerender();
     const first = linesEl.querySelector('input'); if (first) first.focus();
   });
@@ -171,7 +172,7 @@
   });
   $('paste-fill').addEventListener('click', () => {
     const P = BizCalc.parseSheet($('paste-text').value), note = $('paste-note');
-    if (!P.lines.length && !P.totalKrw) { note.textContent = '품목([HS6] 코드·수량·단가)이나 배송비를 찾지 못했어요. 신청서조회 화면을 통째로 복사해 주세요.'; return; }
+    if (!P.lines.length && !P.totalKrw) { note.textContent = '품목(HS코드·수량·단가)이나 배송비를 찾지 못했어요. HS코드가 보이는 신청서 화면을 통째로 복사해 주세요. 배대지 화면이 안 읽히면 hello@jikguse.com으로 그 화면 텍스트를 보내 주시면 맞춰 드립니다.'; return; }
     if (P.lines.length) {
       const unresolved = [];
       lines.length = 0;
@@ -187,23 +188,25 @@
       const bits = [`${P.lines.length}개 품목 채움`];
       if (P.declared) bits.push(Math.abs(P.declared.amount - P.goods) < 0.01 ? `신청서 총구매비 ${P.declared.amount.toLocaleString('ko-KR')} ${P.declared.cur} 일치` : `합계 ${P.goods.toLocaleString('ko-KR')} ${P.cur} — 신청서 총구매비 ${P.declared.amount.toLocaleString('ko-KR')}와 다름, 수량을 확인하세요`);
       if (unresolved.length) bits.push(`HS ${unresolved.join(', ')}는 10자리를 골라 주세요`);
+      if (P.mixed) bits.push(`단가 통화가 섞여 있어요 — ${P.cur} 기준으로 넣었으니 다른 통화 줄은 단가를 고쳐 주세요`);
       note.textContent = bits.join(' · ');
     } else note.textContent = '';
     // 배대지 청구서는 원화: 품목만 채워졌어도 운임 통화를 KRW로 맞춘다 (예전 저장값 USD가 남아 헷갈렸던 건)
     if (P.lines.length || P.totalKrw) { $('frcur').value = 'KRW'; syncFrcur(); }
     if (P.totalKrw) {
       $('total').value = String(P.totalKrw); $('excl').value = String(P.exclKrw || '');
-      $('paste-note').textContent += `${$('paste-note').textContent ? ' · ' : ''}배송비 ${P.totalKrw.toLocaleString('ko-KR')}원${P.exclKrw ? ` 중 과세 제외 ${P.exclKrw.toLocaleString('ko-KR')}원` : ' (결제정보 화면도 붙이면 부가서비스를 뺍니다)'}`;
+      $('paste-note').textContent += `${$('paste-note').textContent ? ' · ' : ''}배송비 ${P.totalKrw.toLocaleString('ko-KR')}원${P.exclKrw ? ` 중 과세 제외 ${P.exclKrw.toLocaleString('ko-KR')}원` : ' (결제·견적 화면도 붙이면 부가서비스를 뺍니다)'}`;
     }
     if (P.co) $('co').checked = true;
     rerender();
   });
 
-  // Bookmarklet: on a forwarder's 신청서조회 page, grab the page text (+ QuickStar's 결제정보 popup, same origin) and open
-  // this page with it in the hash. Nothing leaves the browser except to this page; the hash never reaches a server.
+  // Bookmarklet: on any forwarder's application page, grab the page text and open this page with it in the hash. Where the
+  // page exposes a same-origin 결제정보 popup keyed by a GR code (one forwarder's layout), that is fetched too so the add-on
+  // split and C/O come along. Nothing leaves the browser except to this page; the hash never reaches a server.
   const BM = `(async()=>{const t=document.body.innerText;const g=(document.querySelector('[name=gr_code]')||{}).value||(t.match(/GR\\d{13}/)||[])[0];let p='';if(g){try{const h=await(await fetch('/service/service_03_apply_pop.php?gr_code='+g+'&tabName=con07')).text();p=new DOMParser().parseFromString(h,'text/html').body.textContent}catch(e){}}const i=t.indexOf('제품목록'),j=t.indexOf('고객상담센터');location.href='${location.origin}${base}business/#s='+encodeURIComponent((i>=0?t.slice(i,j>i?j:undefined):t)+'\\n'+p)})()`;
   $('bm').href = 'javascript:' + encodeURIComponent(BM);
-  $('bm').addEventListener('click', e => { e.preventDefault(); $('bm-note').textContent = '클릭이 아니라 이 버튼을 위쪽 북마크바로 끌어다 놓는 거예요. 북마크바에 생기면, 퀵스타 신청서조회 화면에서 그걸 누르세요.'; });
+  $('bm').addEventListener('click', e => { e.preventDefault(); $('bm-note').textContent = '클릭이 아니라 이 버튼을 위쪽 북마크바로 끌어다 놓는 거예요. 북마크바에 생기면, 배대지 신청서 화면에서 그걸 누르세요.'; });
   const fromHash = () => {
     const m = location.hash.match(/^#s=(.+)/);
     if (!m) return;
@@ -231,12 +234,13 @@
     const r = BizCalc.compute(input);
     if (!r.lines.length) {
       out.innerHTML = `<section class="sheet balanced quiet"><p class="sheet-label">예상 세액</p><p class="sheet-title">품목·수량·단가를 넣으면 바로 계산됩니다</p><p class="sheet-text">사업자 일반 수입신고 기준 — 150달러 면세·목록통관·간이세율은 적용하지 않습니다. 이번 주 과세환율 USD ${FX.USD.toLocaleString('ko-KR')}원.</p></section>`;
+      rgItems = []; $('rg-panel').hidden = true;
       return;
     }
     const orig = BizCalc.ORIGINS.find(o => o.k === origin.value);
     // 개당 원가(VAT 제외) = (과세가격 + 관세 + 과세 제외 부가서비스 안분) ÷ 수량 → 로켓그로스 계산기로 넘긴다
     const unitCost = l => (l.cif + l.duty + (r.cif ? r.brokerage * l.cif / r.cif : 0)) / (l.qty || 1);
-    const rows = r.lines.map(l => `<tr><th><span class="ln">${esc(nameOf(l.entry))}</span><small>${fmtHs(l.entry.c)} · ${l.qty.toLocaleString('ko-KR')} × ${l.price.toLocaleString('ko-KR')} ${cur}</small><small><a class="rg-link" href="${base}rocket/#cost=${Math.round(unitCost(l))}&name=${encodeURIComponent(nameOf(l.entry))}">개당 ${won(unitCost(l))} → 로켓그로스 수익 보기</a></small></th><td data-l="과세가격">${won(l.cif)}</td><td data-l="세율">${pct(l.rate.applied.rate)}<small>${esc(l.rate.applied.label)}</small></td><td data-l="관세">${won(l.duty)}</td><td data-l="부가세">${won(l.vat)}</td></tr>`).join('');
+    const rows = r.lines.map(l => `<tr><th><span class="ln">${esc(nameOf(l.entry))}</span><small>${fmtHs(l.entry.c)} · ${l.qty.toLocaleString('ko-KR')} × ${l.price.toLocaleString('ko-KR')} ${cur}</small><small><button type="button" class="rg-link" data-hs="${l.entry.c}">개당 ${won(unitCost(l))} → 로켓그로스 수익 보기</button></small></th><td data-l="과세가격">${won(l.cif)}</td><td data-l="세율">${pct(l.rate.applied.rate)}<small>${esc(l.rate.applied.label)}</small></td><td data-l="관세">${won(l.duty)}</td><td data-l="부가세">${won(l.vat)}</td></tr>`).join('');
     const notes = [];
     if (input.co && r.ftaLines) notes.push(`협정세율 ${r.ftaLines}개 품목 — 수입신고 때 ${esc(orig.name)} 원산지증명서(C/O)를 제출해야 합니다. 원산지 기준(역내 부가가치·세번 변경)을 못 채우면 기본세율로 돌아갑니다.`);
     if (input.co && !r.ftaLines) notes.push(`${esc(orig.name)} 원산지 협정세율이 기본세율보다 낮은 품목이 없어 C/O 없이도 같은 세액입니다.`);
@@ -254,7 +258,7 @@
       ${notes.map(n => `<p class="sheet-text tip">${n}</p>`).join('')}
       <div class="tbl-wrap"><table class="tbl spec biz"><thead><tr><th>품목</th><th>과세가격</th><th>세율</th><th>관세</th><th>부가세</th></tr></thead><tbody>${rows}</tbody></table></div>
       ${reqBlock}
-      <p class="sheet-actions"><button type="button" class="next" id="copy">결과 텍스트 복사</button></p>
+      <p class="sheet-actions"><button type="button" class="next alt" id="rg-open">+ 로켓그로스 수익도 같이 보기</button><button type="button" class="next sec" id="copy">결과 텍스트 복사</button></p>
       <p class="muted small basis">세율: 관세청 품목번호별 관세율표 2026-02-11 · 세관장확인: 관세법 제226조 고시 2026-07-16 · 환율: 관세청 과세환율 ${D.fx.applies_from}~${D.fx.applies_to}. 예상치이며 신고 세액과 품목분류의 책임은 신고인에게 있습니다. 실제 신고 전 관세사 확인을 권합니다. 세율 오류 제보: hello@jikguse.com</p></section>`;
     $('copy').addEventListener('click', () => {
       const txt = [`[직구세 사업자 수입 계산 · jikguse.com/business/]`, `원산지 ${orig.name} · ${input.co ? 'C/O 있음' : 'C/O 없음'} · 과세환율 ${cur} ${FX[cur]}원`,
@@ -262,6 +266,10 @@
         `관세 ${won(r.duty)} + 부가세 ${won(r.vat)} = ${won(r.tax)} · 총 착지비용 ${won(r.landed)} (부가세 공제 후 ${won(r.landedNet)})`, `※ 예상치. 신고 책임은 신고인, 관세사 확인 권장.`].join('\n');
       navigator.clipboard.writeText(txt).then(() => { $('copy').textContent = '복사했어요'; setTimeout(() => { $('copy').textContent = '결과 텍스트 복사'; }, 1500); });
     });
+    rgItems = r.lines.map(l => ({ hs: l.entry.c, name: nameOf(l.entry), cost: unitCost(l) }));
+    $('rg-open').addEventListener('click', () => openRg());
+    out.querySelectorAll('.rg-link').forEach(b => b.addEventListener('click', () => openRg(b.dataset.hs)));
+    if (!$('rg-panel').hidden) syncRg();
     if (reqLines.length) reqReady().then(req => {
       out.querySelectorAll('#req li').forEach(li => {
         const items = req[li.dataset.hs] || [];
@@ -269,6 +277,24 @@
       });
     });
   }
+
+  // ----- 로켓그로스 panel: the same widget as /rocket/, fed the per-line landed unit cost. One saved slot per HS code. -----
+  let rgItems = [], rgW = null, rgHs = null;
+  const rgHost = $('rg-host'), rgChips = $('rg-chips');
+  const rgReady = () => rgW ? Promise.resolve(rgW) : fetch(rgHost.dataset.fees).then(r => r.json()).then(fees => (rgW = window.RgWidget.mount(rgHost, { fees, catsUrl: rgHost.dataset.cats, base, key: null, embedded: true })));
+  function syncRg() {
+    if (!rgItems.some(i => i.hs === rgHs)) rgHs = rgItems.length ? rgItems[0].hs : null;
+    rgChips.innerHTML = rgItems.map(i => `<button type="button" class="chip${i.hs === rgHs ? ' on' : ''}" role="tab" aria-selected="${i.hs === rgHs}" data-hs="${i.hs}">${esc(i.name)}<small>개당 ${won(i.cost)}</small></button>`).join('');
+    rgChips.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => { rgHs = b.dataset.hs; syncRg(); }));
+    const it = rgItems.find(i => i.hs === rgHs);
+    if (it && rgW) rgW.load(KEY + '.rg.' + it.hs, { cost: it.cost, name: it.name, note: `${it.name} 개당 원가 ${won(it.cost)} — 위 수입 계산에서 가져옴 (물품가 + 관세 + 운임·부가서비스 안분, 부가세 제외). 위 수입 계산이 바뀌면 같이 바뀝니다.` });
+  }
+  function openRg(hs) {
+    if (hs) rgHs = hs;
+    $('rg-panel').hidden = false;
+    rgReady().then(() => { syncRg(); $('rg-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); if (!hs) return; setTimeout(() => rgW.focus(), 500); });
+  }
+  $('rg-close').addEventListener('click', () => { $('rg-panel').hidden = true; out.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
   mountAll();
   render();

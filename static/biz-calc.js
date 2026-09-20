@@ -113,44 +113,58 @@
     return { entry: group.length === 1 || same ? group[0] : null, n: group.length, same, group };
   }
 
-  // Parse text copied from a forwarder's application page (QuickStar 신청서조회 / 결제정보 layout): item blocks
-  // "[HS6] name … 단가 10.43 CNY … 수량 115", shipping "총배송요금 185,000 KRW" (or "배송비\n185,000 KRW"), the
-  // non-dutiable add-ons (부가서비스·추가요금: 신고대행·C/O 발급·원산지작업…) and whether a C/O was issued.
+  // Parse text copied from any forwarder's application page (신청서조회 / 결제정보 / 견적 화면). Items are located by an HS
+  // code in any common notation ("[620453]", "HS 6204.53", "6204.53.0000", "HS코드 620453") and read the nearest
+  // 수량/qty and 단가/price (currency code, symbol or 원·元·달러 word). Shipping = 총배송요금 / 배송비 / 배송요금 / 운임 / 결제금액;
+  // non-dutiable add-ons = 부가서비스·추가요금·통관대행·신고대행·서류작성·원산지증명·국내택배 amounts; C/O = a certificate line.
+  // Verified layouts: QuickStar (scripts/fixtures/quickstar_*.txt). Other forwarders share the vocabulary but not the layout.
   function parseSheet(text) {
-    const t = String(text || '').replace(/\r/g, '');
+    const t = String(text || '').replace(/\r/g, '').replace(/[\u00a0\t]+/g, ' ');
     const num = s => parseFloat(String(s).replace(/,/g, ''));
+    const SYM = { '¥': 'CNY', '￥': 'CNY', '元': 'CNY', '위안': 'CNY', '$': 'USD', '＄': 'USD', '달러': 'USD', '€': 'EUR', '유로': 'EUR', '£': 'GBP', '엔': 'JPY', '원': 'KRW' };
+    const CODE = '(?:[A-Z]{3}|원|元|위안|달러|유로|엔)';
     const marks = [];
-    const re = /\[(\d{6})\]/g;
+    const hsRe = /\[(\d{6})\]|(?:HS\s*(?:코드|code)?|품목\s*번호|세번|HSK)\s*[:：]?\s*(\d{4})[.\-\s]?(\d{2})(?:[.\-\s]?\d{2,4})?|(?<![\d.,])(\d{4})\.(\d{2})(?:\.(\d{2})(?:\.\d{2})?|(?![\d.,]|\s*(?:[A-Z]{3}|원|元|위안|달러|엔|유로|%)))/gi;
     let m;
-    while ((m = re.exec(t))) marks.push({ h6: m[1], at: m.index });
+    while ((m = hsRe.exec(t))) {
+      const h6 = m[1] || (m[2] ? m[2] + m[3] : m[4] + m[5]);
+      if (!marks.length || marks[marks.length - 1].at !== m.index) marks.push({ h6, at: m.index });
+    }
     const lines = [];
-    let cur = null;
+    let cur = null, mixed = false; // mixed: lines quoted in more than one currency — caller should warn
     marks.forEach((p, i) => {
       const seg = t.slice(p.at, marks[i + 1] ? marks[i + 1].at : p.at + 800);
-      const pm = seg.match(/단가\s*([\d,]+(?:\.\d+)?)\s*([A-Z]{3})/), qm = seg.match(/수량\s*([\d,]+)/);
+      const pm = seg.match(new RegExp('(?:단가|unit\\s*price|price|가격|금액)\\s*[:：]?\\s*([¥￥$＄€£]?)\\s*([\\d,]+(?:\\.\\d+)?)\\s*(' + CODE + ')?', 'i'))
+        || seg.match(/([¥￥$＄€£])\s*([\d,]+(?:\.\d+)?)()/) || seg.match(/()(?<![\d.,])([\d,]+(?:\.\d+)?)\s*((?!KRW)[A-Z]{3}|元|위안|달러|유로|엔)\b/); // keyworded, symbol-prefixed, or code-suffixed
+      const qm = seg.match(/(?:수량|qty|quantity|pcs|개수)\s*[:：]?\s*([\d,]+)/i) || seg.match(/(?<![\d.,])([\d,]+)\s*(?:개(?!월)|pcs|ea)(?![A-Za-z가-힣])/i);
       if (!pm || !qm) return;
-      const price = num(pm[1]), qty = parseInt(qm[1].replace(/,/g, ''), 10);
+      const price = num(pm[2]), qty = parseInt(qm[1].replace(/,/g, ''), 10);
       if (!(price > 0 && qty > 0)) return;
-      cur = cur || pm[2];
+      const c = pm[3] ? (SYM[pm[3]] || pm[3].toUpperCase()) : (SYM[pm[1]] || null);
+      if (c && c !== 'KRW') { cur = cur || c; if (c !== cur) mixed = true; }
       const dup = lines.find(l => l.h6 === p.h6 && l.price === price);
       if (dup) dup.qty += qty; else lines.push({ h6: p.h6, qty, price });
     });
+    if (!cur) { const dm = t.match(new RegExp('(?:총구매비|해외구매비|상품금액|물품가|구매금액)\\s*[:：]?\\s*([¥￥$＄€£]?)\\s*[\\d,]+(?:\\.\\d+)?\\s*(' + CODE + ')?')); if (dm) cur = dm[2] ? (SYM[dm[2]] || dm[2].toUpperCase()) : (SYM[dm[1]] || null); if (cur === 'KRW') cur = null; }
     const goods = lines.reduce((s, l) => s + l.qty * l.price, 0);
-    const decl = t.match(/총구매비\s*:?\s*([\d,]+(?:\.\d+)?)\s*([A-Z]{3})/);
+    const decl = t.match(/(?:총구매비|해외구매비)\s*[:：]?\s*([\d,]+(?:\.\d+)?)\s*([A-Z]{3})/);
     let totalKrw = 0, exclKrw = 0;
-    const pay = t.match(/총배송요금\s*([\d,]+)\s*KRW/);
+    const krw = '([\\d,]+)\\s*(?:KRW|원)';
+    const pay = t.match(new RegExp('총\\s*배송\\s*(?:요금|비)\\s*[:：]?\\s*' + krw));
     if (pay) { // 결제정보 popup: itemised add-ons
       totalKrw = num(pay[1]);
-      for (const mm of t.matchAll(/(?:부가서비스\[[^\]]*\]|추가요금)\s*([\d,]+)\s*KRW/g)) exclKrw += num(mm[1]);
+      for (const mm of t.matchAll(new RegExp('(?:부가서비스\\[[^\\]]*\\]|추가요금)\\s*[:：]?\\s*' + krw, 'g'))) exclKrw += num(mm[1]);
     } else {
-      const ship = t.match(/(?:^|\n)배송비\s*\n?\s*([\d,]+)\s*KRW/);
+      const ship = t.match(new RegExp('(?:^|\\n)\\s*(?:배송비|배송요금|배송료|국제운임|운임|해외배송비)\\s*[:：]?\\s*\\n?\\s*' + krw)) || t.match(new RegExp('(?:총\\s*결제\\s*금액|결제금액|청구금액|총액)\\s*[:：]?\\s*\\n?\\s*' + krw));
       if (ship) totalKrw = num(ship[1]);
       const blk = t.match(/부가서비스\[출고\]([\s\S]*?)(?:\n운송방법|$)/);
       if (blk) for (const mm of blk[1].matchAll(/\)\s+([\d,]+)\s*(?:\n|$)/g)) exclKrw += num(mm[1]);
+      else for (const mm of t.matchAll(new RegExp('(?:통관\\s*대행(?:료|비)?|신고\\s*대행(?:료|비)?|서류\\s*작성(?:비)?|원산지\\s*증명서?(?:\\s*발급)?(?:비|료)?|C/O(?:\\s*발급)?|국내\\s*(?:택배|배송)(?:비|료)?)\\s*[:：]?\\s*' + krw, 'gi'))) exclKrw += num(mm[1]);
     }
-    const co = /\d\s*원산지증명서|원산지증명서 발급\([^)]*\)\s+[\d,]+\s*(?:\n|$)/.test(t);
+    if (exclKrw > totalKrw) exclKrw = 0; // add-ons read from somewhere that isn't the shipping bill — don't trust them
+    const co = /\d\s*원산지증명서|원산지증명서 발급\([^)]*\)\s+[\d,]+\s*(?:\n|$)|(?:원산지\s*증명서?|C\/O)\s*(?:발급|있음|신청|포함|O|Y|✓)/i.test(t);
     return { lines, cur, goods: Math.round(goods * 100) / 100, declared: decl ? { amount: num(decl[1]), cur: decl[2] } : null,
-      totalKrw, exclKrw, co, origin: cur === 'CNY' ? 'CN' : null };
+      totalKrw, exclKrw, co, mixed, origin: cur === 'CNY' ? 'CN' : cur === 'JPY' ? 'JP' : null };
   }
 
   root.BizCalc = { AGREEMENTS, ORIGINS, rateFor, compute, floor10, resolveH6, parseSheet };
