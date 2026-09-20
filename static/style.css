@@ -36,7 +36,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:16p
 header nav{display:flex;gap:6px;flex-wrap:wrap}
 header nav a{color:var(--text-2);font-size:.92rem;padding:6px 10px;border-radius:10px}
 header nav a:hover{background:var(--surface);color:var(--text)}
-@media(max-width:560px){header.top{flex-direction:column;align-items:flex-start;gap:8px}header nav a{padding:4px 8px}}
+@media(max-width:560px){header.top{flex-direction:column;align-items:flex-start;gap:8px}header nav{flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:0 -20px;padding:0 20px}header nav::-webkit-scrollbar{display:none}header nav a{padding:4px 8px;white-space:nowrap}}
 footer{max-width:720px;margin:0 auto;padding:32px 20px 48px;color:var(--muted);font-size:.9rem;border-top:1px solid var(--line)}
 footer a{color:var(--text-2)}
 .crumbs{color:var(--muted);font-size:.9rem;margin-top:16px}.crumbs a{color:var(--muted)}
@@ -586,3 +586,61 @@ html.landing .stage{display:flex;flex-direction:column;justify-content:center;mi
 .num-in::placeholder{color:var(--muted);font-weight:500}/* example amounts must not read as typed values */
 html.landing .below{display:none}
 #result{scroll-margin-top:calc(var(--hdr,64px) + 16px)}/* phone: the result scrolls to just below the sticky header */
+
+/* ---- Business calculator (/business/): stacked layout, line cards, per-line result table ---- */
+.biz-grid{grid-template-columns:minmax(0,1fr);max-width:720px}
+.biz-grid .field,.biz-grid .row>*{min-width:0}.biz-grid select{max-width:100%;text-overflow:ellipsis}
+.sub-h{font-size:.95rem;color:var(--text-2);margin:22px 0 8px;font-weight:700}
+.line{background:var(--surface);border-radius:16px;padding:14px;margin-top:10px}
+.calc-grid .line .pick,.calc-grid .line .num-in{background:var(--bg)}
+.line .qp{display:grid;grid-template-columns:1fr 1.4fr auto;gap:10px;margin-top:10px;align-items:end}
+.line .rm{align-self:end;height:56px;width:44px;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:1rem;cursor:pointer}
+.line .rm:hover{background:var(--surface-2);color:var(--text)}
+.line .cur-l{font-weight:600;font-size:.8rem}
+.line-meta{margin:8px 0 0;min-height:1.2em;overflow-wrap:anywhere}
+.line-meta:empty{display:none}
+.menu li b{display:block;font-weight:700}.menu li small{display:block;color:var(--muted);font-weight:500;font-size:.8rem;line-height:1.35}
+.add{margin-top:12px;width:100%;padding:13px;border:1px dashed var(--line);border-radius:14px;background:transparent;color:var(--blue);font:inherit;font-weight:700;cursor:pointer}
+.add:hover{background:var(--blue-soft)}
+.money .unit-sel{appearance:none;-webkit-appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-size:.85rem;font-weight:700;padding:0 18px 0 0;margin-right:6px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4' fill='none' stroke='%238b95a1' stroke-width='2' stroke-linecap='round'/></svg>") no-repeat right center;cursor:pointer}
+.check.co{padding-top:18px}
+.tbl-wrap{overflow-x:auto;margin-top:14px;-webkit-overflow-scrolling:touch}
+.sheet .tbl.biz{background:transparent;margin:0;min-width:520px;font-size:.9rem}
+.sheet .tbl.biz th,.sheet .tbl.biz td{padding:10px 8px;border-bottom:1px solid rgba(0,0,0,.06);text-align:right;white-space:nowrap;vertical-align:top}
+.sheet .tbl.biz thead th{color:var(--muted);font-size:.78rem;font-weight:600;width:auto}.sheet .tbl.biz thead th:first-child{text-align:left}
+.sheet .tbl.biz tbody th{text-align:left;width:auto;font-weight:600;color:var(--text);white-space:normal;min-width:160px}
+.sheet .tbl.biz tbody th small{display:block;color:var(--muted);font-weight:500;font-size:.75rem;white-space:normal}.sheet .tbl.biz td small{display:block;color:var(--muted);font-weight:500;font-size:.75rem;white-space:nowrap}
+.sheet .tbl.biz tbody td{font-feature-settings:"tnum";font-weight:600}
+.sheet .tbl.biz tr:last-child th,.sheet .tbl.biz tr:last-child td{border-bottom:0}
+.req{margin-top:18px;padding-top:14px;border-top:1px solid rgba(0,0,0,.08)}
+.req .sheet-title{margin-top:0}
+.req-list{list-style:none;margin:10px 0 0;padding:0}
+.req-list li{background:var(--bg);border-radius:12px;padding:10px 12px;margin-top:8px}
+.req-list li small{color:var(--muted)}
+.req-body{margin-top:4px}
+.req-body details{margin-top:4px}.req-body summary{cursor:pointer;font-weight:600;color:var(--text-2)}
+.req-body p{margin:.3em 0 .5em;line-height:1.5;color:var(--text-2)}
+.sheet .basis{margin-top:14px;line-height:1.5}
+.sheet-actions button.next{border:0;font:inherit;cursor:pointer}
+@media(max-width:560px){
+  .line .qp{grid-template-columns:1fr 1fr auto}
+  /* phone: each line becomes a card — name on top, four labelled cells below — instead of a sideways-scrolling table */
+  .sheet .tbl.biz{min-width:0;font-size:.88rem}
+  .sheet .tbl.biz thead{display:none}
+  .sheet .tbl.biz tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+  .sheet .tbl.biz tbody tr:last-child{border-bottom:0}
+  .sheet .tbl.biz tbody th,.sheet .tbl.biz tbody td{border:0;padding:2px 0;text-align:left;white-space:normal}
+  .sheet .tbl.biz tbody th{grid-column:1/-1;min-width:0;padding-bottom:6px}
+  .sheet .tbl.biz tbody td::before{content:attr(data-l);display:block;color:var(--muted);font-size:.72rem;font-weight:600}
+  .sheet .tbl.biz tbody td small{display:inline;margin-left:4px}
+}
+@media(max-width:560px) and (prefers-color-scheme:dark){.sheet .tbl.biz tbody tr{border-bottom-color:rgba(255,255,255,.08)}}
+@media(prefers-color-scheme:dark){
+  .line{background:var(--surface-2)}
+  .calc-grid .line .pick,.calc-grid .line .num-in{background:var(--surface)}
+  .sheet .tbl.biz th,.sheet .tbl.biz td{border-bottom-color:rgba(255,255,255,.08)}
+  .req{border-top-color:rgba(255,255,255,.1)}
+  .req-list li{background:rgba(255,255,255,.05)}
+  .add{border-color:var(--line)}
+  .add:hover{background:var(--blue-soft)}
+}

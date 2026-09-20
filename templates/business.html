@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}사업자 수입 관부가세 계산기 — HS코드·FTA·다품목 LCL 한 번에 | {{ site }}{% endblock %}
+{% block description %}구매대행·수입 사업자용. HS 10자리 세율(기본·WTO·한중 FTA 등 협정세율)로 품목별 관세·부가세를 계산하고, 운임·보험을 품목별로 안분합니다. 세관장확인 대상 품목 표시, 관세청 관세율표 기준.{% endblock %}
+{% block head %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"{{ site }} 사업자 수입 관부가세 계산기","applicationCategory":"FinanceApplication","operatingSystem":"Any","inLanguage":"ko","offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"},"url":"{{ origin }}{{ base }}business/"}</script>
+{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>사업자 수입 관부가세, 품목별로 한 번에</h1>
+  <p>구매대행·소매 수입용. 여러 품목을 한 화물(LCL)로 들여올 때 HS 10자리 세율로 품목별 관세·부가세를 계산하고 운임을 안분합니다. 개인 면세(150달러)·목록통관·간이세율은 적용하지 않습니다. 환율은 이번 주 관세청 과세환율({{ fx.rates.USD|int }}원/달러).</p>
+</section>
+
+<section class="calc-grid biz-grid">
+<div class="calc card" id="biz">
+  <h2 class="card-title">화물 정보</h2>
+  <div class="row">
+    <label class="field"><span>원산지 <small class="muted">(Made in — 협정세율 기준)</small></span>
+      <select id="origin"></select>
+    </label>
+    <label class="field"><span>결제 통화 <small class="muted">(단가 기준)</small></span>
+      <select id="cur"></select>
+    </label>
+  </div>
+  <h3 class="sub-h">품목</h3>
+  <div id="lines" data-hs="{{ base }}static/hs.json?v={{ hv }}" data-req="{{ base }}static/hs_req.json?v={{ hv }}"></div>
+  <button type="button" class="add" id="add">+ 품목 추가</button>
+  <h3 class="sub-h">운임·비용</h3>
+  <div class="row">
+    <label class="field"><span>국제운임 <small class="muted">(FOB→한국 도착)</small></span>
+      <span class="money"><select id="frcur" class="unit-sel" aria-label="운임 통화"></select><input id="freight" class="num-in" type="text" inputmode="decimal" placeholder="300" autocomplete="off"></span>
+    </label>
+    <label class="field">보험료
+      <span class="money"><span class="unit" id="frcur2">USD</span><input id="ins" class="num-in" type="text" inputmode="decimal" placeholder="0" autocomplete="off"></span>
+    </label>
+  </div>
+  <div class="row">
+    <label class="field"><span>통관수수료·관세사 <small class="muted">(과세 제외)</small></span>
+      <span class="money"><span class="unit">KRW</span><input id="broker" class="num-in" type="text" inputmode="numeric" placeholder="30000" autocomplete="off"></span>
+    </label>
+    <label class="field"><span>국내 운송비 <small class="muted">(과세 제외)</small></span>
+      <span class="money"><span class="unit">KRW</span><input id="domestic" class="num-in" type="text" inputmode="numeric" placeholder="0" autocomplete="off"></span>
+    </label>
+  </div>
+  <label class="check co"><input id="co" type="checkbox"> <span>원산지증명서(C/O) 있음 — 협정세율(FTA·RCEP) 적용</span></label>
+  <p class="muted small">예상치입니다. 품목분류(HS)와 신고 세액의 책임은 신고인에게 있습니다. <a href="{{ base }}methodology/#business">계산 방법 보기</a></p>
+</div>
+<div id="result" class="result" aria-live="polite"></div>
+</section>
+
+<div class="ad-slot"><!-- ad: business_below --></div>
+
+<section class="prose">
+  <h2>개인 직구 계산기와 무엇이 다른가</h2>
+  <p>판매 목적 수입에는 미화 150달러 소액면세, 목록통관, 간이세율이 <strong>모두 적용되지 않습니다</strong>. 과세가격은 물품가 + 국제운임 + 보험료(CIF)이고, 여기에 HS 10자리 세율로 관세, 그 위에 부가세 10%가 붙습니다. 부가세는 사업자라면 매입세액공제를 받으므로 실제 비용은 관세와 운임·수수료입니다.</p>
+  <h2>세율은 이렇게 고릅니다</h2>
+  <p>관세청 관세율표의 <strong>기본세율</strong>과 <strong>WTO 협정세율</strong> 중 낮은 쪽이 기본으로 적용됩니다(관세법 제50조). 원산지증명서(C/O)를 갖추면 원산지 국가와 맺은 협정(한·중 FTA, RCEP, 한·미 FTA 등) 중 가장 낮은 세율을 쓸 수 있고, 이 계산기는 그중 가장 낮은 협정을 자동으로 고릅니다. 예를 들어 중국산 면 후드티(6110.20)는 기본 13% → 한·중 FTA 5.2%, 낚시 릴(9507.30)은 기본 8% → 한·중 FTA 0%입니다.</p>
+  <h2>여러 품목이 한 화물로 올 때</h2>
+  <p>스포츠용품 + 의류 + 낚시용품처럼 품목이 섞인 LCL 화물은 품목별로 세율이 달라 각각 신고합니다. 운임과 보험료는 품목별 물품가 비율로 나눠 과세가격에 더합니다(관세평가 운영 고시). 이 계산기는 같은 방식으로 안분해 품목별 관세·부가세와 합계를 보여 줍니다.</p>
+  <h2>세관장확인 대상이면 세금보다 요건이 먼저</h2>
+  <p>전기·전자제품(전파법·전기용품안전관리법), 어린이제품, 식품, 화장품 등은 관세법 제226조에 따라 수입신고 전에 요건승인기관의 확인이 필요합니다. 해당 품목을 고르면 관계 법령과 요건 문구를 결과 아래에 그대로 보여 드립니다. KC 인증 같은 국내 유통 의무는 세관장확인과 별개로 따로 확인하세요.</p>
+</section>
+<script src="{{ base }}static/biz-calc.js?v={{ v }}" defer></script>
+<script src="{{ base }}static/biz.js?v={{ v }}" defer></script>
+{% endblock %}

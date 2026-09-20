@@ -49,12 +49,13 @@ def main():
     for f in sorted((ROOT / "static").glob("*")):
         h.update(f.read_bytes())
     v = h.hexdigest()[:8]
+    hv = hashlib.md5((ROOT / "data/hs.json").read_bytes() + (ROOT / "data/hs_req.json").read_bytes()).hexdigest()[:8]
 
     env = Environment(loader=FileSystemLoader(ROOT / "templates"), autoescape=select_autoescape(["html"]))
     env.filters["won"] = won
     env.filters["won_k"] = lambda n: won(round(n, -3))  # '약 155,000원' in titles — an exact-looking 155,016 next to '약' reads wrong
     env.filters["pct"] = lambda r: f"{r * 100:g}%"
-    env.globals.update(site=SITE, base=base, origin=origin, today=date.today().isoformat(), v=v,
+    env.globals.update(site=SITE, base=base, origin=origin, today=date.today().isoformat(), v=v, hv=hv,
                        adsense_pub=args.adsense_pub, items=items, countries=countries, fx=fx, rules=RULES)
 
     if DIST.exists():
@@ -62,6 +63,8 @@ def main():
     DIST.mkdir()
     shutil.copytree(ROOT / "static", DIST / "static")
     (DIST / "static/data.json").write_text(json.dumps({"items": items, "countries": countries, "fx": fx, "rules": RULES}, ensure_ascii=False, separators=(",", ":")))
+    for f in ("hs.json", "hs_req.json"):  # business calculator tables (scripts/build_hs.py), fetched lazily
+        shutil.copy(ROOT / "data" / f, DIST / "static" / f)
 
     urls = []
 
@@ -72,6 +75,7 @@ def main():
         urls.append(path)
 
     write("", "index.html")
+    write("business/", "business.html")
     for page in ("about", "methodology", "privacy", "contact"):
         write(f"{page}/", f"{page}.html")
     for g in ("list-clearance", "combined-tax", "fx", "fta"):
