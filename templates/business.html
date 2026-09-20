@@ -21,11 +21,18 @@
       <select id="cur"></select>
     </label>
   </div>
-  <div class="sub-row"><h3 class="sub-h">품목</h3><button type="button" class="link-btn" id="paste-toggle" aria-expanded="false" aria-controls="paste">신청서 붙여넣기</button></div>
+  <h3 class="sub-h">품목</h3>
+  <div class="import">
+    <div class="import-text">
+      <b>퀵스타 신청서 그대로 가져오기</b>
+      <span class="muted small">① 파란 [직구세로 보내기] 버튼을 <b>클릭 말고</b> 크롬 위쪽 북마크바로 끌어다 놓기(한 번만, 북마크바가 안 보이면 ⌘⇧B) → ② 퀵스타 <b>신청서조회</b> 화면에서 그 북마크 누르기. 품목·배송비·부가서비스·C/O가 채워진 채로 이 페이지가 열립니다. 확장 프로그램 설치 아님.</span>
+      <span class="muted small" id="bm-note" aria-live="polite"></span>
+    </div>
+    <div class="import-actions"><a id="bm" class="bm" href="#" draggable="true" title="북마크바로 끌어다 놓으세요">직구세로 보내기</a><button type="button" class="link-btn" id="paste-toggle" aria-expanded="false" aria-controls="paste">붙여넣기로 하기</button></div>
+  </div>
   <div id="paste" class="paste" hidden>
     <textarea id="paste-text" rows="5" placeholder="배대지(퀵스타 등) '신청서조회' 화면을 전체 선택(⌘/Ctrl+A)·복사해서 붙여 넣으세요. [결제정보] 화면도 이어 붙이면 운임 나누기와 C/O 여부까지 채워집니다."></textarea>
     <div class="paste-actions"><button type="button" class="next" id="paste-fill">품목·운임 채우기</button><span class="muted small" id="paste-note"></span></div>
-    <p class="muted small bm-help">한 번에 하려면: <a id="bm" class="bm" href="#" draggable="true">직구세로 보내기</a> 를 북마크바로 끌어다 놓고, 퀵스타 <b>신청서조회</b> 화면에서 누르세요. 품목·배송비·부가서비스·C/O가 채워진 채로 이 페이지가 열립니다(결제정보까지 자동으로 읽습니다).</p>
   </div>
   <div id="lines" data-hs="{{ base }}static/hs.json?v={{ hv }}" data-req="{{ base }}static/hs_req.json?v={{ hv }}"></div>
   <button type="button" class="add" id="add">+ 품목 추가</button>

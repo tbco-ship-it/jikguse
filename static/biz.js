@@ -179,8 +179,9 @@
       if (unresolved.length) bits.push(`HS ${unresolved.join(', ')}는 10자리를 골라 주세요`);
       note.textContent = bits.join(' · ');
     } else note.textContent = '';
+    // 배대지 청구서는 원화: 품목만 채워졌어도 운임 통화를 KRW로 맞춘다 (예전 저장값 USD가 남아 헷갈렸던 건)
+    if (P.lines.length || P.totalKrw) { $('frcur').value = 'KRW'; syncFrcur(); }
     if (P.totalKrw) {
-      $('frcur').value = 'KRW'; syncFrcur();
       $('total').value = String(P.totalKrw); $('excl').value = String(P.exclKrw || '');
       $('paste-note').textContent += `${$('paste-note').textContent ? ' · ' : ''}배송비 ${P.totalKrw.toLocaleString('ko-KR')}원${P.exclKrw ? ` 중 과세 제외 ${P.exclKrw.toLocaleString('ko-KR')}원` : ' (결제정보 화면도 붙이면 부가서비스를 뺍니다)'}`;
     }
@@ -192,7 +193,7 @@
   // this page with it in the hash. Nothing leaves the browser except to this page; the hash never reaches a server.
   const BM = `(async()=>{const t=document.body.innerText;const g=(document.querySelector('[name=gr_code]')||{}).value||(t.match(/GR\\d{13}/)||[])[0];let p='';if(g){try{const h=await(await fetch('/service/service_03_apply_pop.php?gr_code='+g+'&tabName=con07')).text();p=new DOMParser().parseFromString(h,'text/html').body.textContent}catch(e){}}const i=t.indexOf('제품목록'),j=t.indexOf('고객상담센터');location.href='${location.origin}${base}business/#s='+encodeURIComponent((i>=0?t.slice(i,j>i?j:undefined):t)+'\\n'+p)})()`;
   $('bm').href = 'javascript:' + encodeURIComponent(BM);
-  $('bm').addEventListener('click', e => { e.preventDefault(); $('paste-note').textContent = '이 링크는 클릭이 아니라 북마크바로 끌어다 놓는 용도예요.'; });
+  $('bm').addEventListener('click', e => { e.preventDefault(); $('bm-note').textContent = '클릭이 아니라 이 버튼을 위쪽 북마크바로 끌어다 놓는 거예요. 북마크바에 생기면, 퀵스타 신청서조회 화면에서 그걸 누르세요.'; });
   const fromHash = () => {
     const m = location.hash.match(/^#s=(.+)/);
     if (!m) return;
