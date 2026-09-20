@@ -8,8 +8,9 @@
 //   load(key, { cost, name, note, query, hs }) switches the saved-state slot (localStorage key) and, when given, sets the unit cost;
 //   query (the 품명 typed on the forwarder sheet) + hs (its HS code, chapter → likely 1차 카테고리) pick a Coupang category
 //   automatically when the slot has none saved.
-// 윙 실적 진단 (rg-wing.js): the 상품 관리 row pasted from Wing fills 월 판매량·반품률 with measured values, offers the 30-day
-// real selling price (표시가 + 판매자 할인 as the model's sellerDisc) and prints 판매 속도·재고 소진·다음 수입 발주 수량.
+// 윙 실적 진단 (rg-wing.js): the 상품 관리 row pasted from Wing fills 월 판매량·반품률 with measured values, checks the picked
+// 사이즈 유형·카테고리 against 쿠팡 예상 비용(개당) and prints 판매 속도·재고 소진·다음 수입 발주 수량. Wing's 매출 is 단품 × 표시가,
+// so no real selling price is derived from it (2026-09-21: the old 실판매가 row invented a 42.5% discount on a bundled product).
 // Size: the seller picks a 쿠팡 사이즈 유형 (극소형~특대형) by default — few people know their packed dimensions — and the tier's
 // representative dims (RgCalc.tierDims) stand in for storage volume and bundle sizing. Exact mm/g entry is behind a toggle.
 (function (root) {
@@ -210,7 +211,6 @@
     // measured values replace the estimates: 월 판매량 ← 지난 30일 판매량, 반품률 ← 반품률(월)
     const wingMonthly = () => W && (W.d30.sold != null ? W.d30.sold : W.d7.sold != null ? Math.round(W.d7.sold / 7 * 30) : null);
     const wingRet = () => W && W.ret.rate != null ? Math.round(W.ret.rate * 10) / 10 : null;
-    const wingDisc = () => W && W.price.list > 0 && W.d30.sold > 0 && W.d30.rev != null ? Math.max(0, Math.round((1 - W.d30.rev / W.d30.sold / W.price.list) * 1000) / 10) : null;
     function fillFromWing() {
       const m = wingMonthly(), r = wingRet();
       if (m != null) F.monthly.value = String(m);
@@ -366,18 +366,17 @@
       F.ret.closest('.field').classList.toggle('wing', !!W && wingRet() != null && numv(F.ret.value) === wingRet());
       if (!W) { wingOut.innerHTML = ''; return; }
       const RgWing = root.RgWing, I = ev.I;
-      const disc = wingDisc(), list = W.price.list;
-      // per-unit profit at the 30-day real selling price (표시가 + 판매자 할인 = 모델의 sellerDisc), when the form is complete
-      const realS = disc != null ? { ...state(), price: String(list), disc: String(disc) } : null;
-      const evReal = ev.ok && realS ? evaluate(FEES, realS) : ev.ok ? ev : null;
-      const perUnit = evReal && evReal.ok ? evReal.c.expected : null;
+      const list = W.price.list, basis = W.price.final || list; // 쿠팡 예상 비용은 최종구매가 기준 (2,678 = 7,350 × 7.8% + 극소형 980 + 1,125)
+      const perUnit = ev.ok ? ev.c.expected : null;
       const lead = numv(WF.lead.value) || 25, cover = numv(WF.cover.value) || 0;
       const d = RgWing.diagnose(W, { lead, cover, perUnit });
-      const applied = realS && numv(F.price.value) === list && Math.abs(numv(F.disc.value) - disc) < 0.05;
-      const tone = perUnit != null && perUnit < 0 ? 'severe' : (d.shortage > 0) || (d.trend != null && d.trend < -0.3) ? 'moderate' : 'balanced';
+      // 사이즈 유형·카테고리 대조: 쿠팡 예상 비용을 이 카테고리 요금표로 역산해 가장 가까운 유형을 찾는다
+      const inf = ev.ok && W.cost.unit != null ? RgWing.inferTier(W.cost.unit, basis, cat.r, unitOf(cat)) : null;
+      const tierOff = inf && inf.i !== I.tier.i; // 쿠팡 비용에 가장 가까운 유형이 지금 고른 유형이 아니다
+      const catOff = inf && Math.abs(inf.gap) > 0.15; // 어느 유형으로도 안 맞으면 수수료율(카테고리)이 다르다
+      const tone = perUnit != null && perUnit < 0 ? 'severe' : tierOff || catOff || (d.shortage > 0) || (d.trend != null && d.trend < -0.3) ? 'moderate' : 'balanced';
       const rows = [];
-      if (d.asp.d30 != null) rows.push(['실제 평균 판매가 (30일)', won(d.asp.d30), `매출 ${won(W.d30.rev)} ÷ ${cnt(W.d30.sold)}${list ? ` · 표시가 ${won(list)} 대비 ${signPct(-d.discount)}` : ''}${d.asp.d7 != null ? ` · 7일 ${won(d.asp.d7)}` : ''}${d.asp.y != null ? ` · 어제 ${won(d.asp.y)}` : ''}${W.price.final != null ? ` · 최종구매가 ${won(W.price.final)}` : ''}`]);
-      else if (list) rows.push(['표시 판매가', won(list), W.price.final != null ? `최종구매가 ${won(W.price.final)}` : '매출 박스가 없어 실판매가는 못 구했어요']);
+      if (list) rows.push(['판매가', won(list), `${W.price.final != null && W.price.final !== list ? `최종구매가 ${won(W.price.final)} (자동조정 할인) · ` : ''}${d.revIsList === true ? `윙 매출 ${won(W.d30.rev)} = 단품 ${cnt(d.revUnits)}${d.revInferred ? '(역산)' : ''} × 표시가 — 할인·번들 매출은 이 집계에 없어 실판매가는 못 구합니다` : d.revIsList === false ? `윙 매출 ${won(W.d30.rev)} ÷ ${cnt(d.revUnits)} = ${won(d.revPerUnit)} — 윙 매출은 단품 판매분만 표시가로 집계해서 번들이 섞이면 낮게 나옵니다. 실판매가로 쓰지 마세요` : '매출 박스가 없어요'}`]);
       if (d.rate != null) rows.push(['판매 속도', `하루 ${n1(d.rate)}개`, `${W.d7.sold != null ? `지난 7일 ${cnt(W.d7.sold)}` : ''}${W.d30.sold != null ? ` · 30일 ${cnt(W.d30.sold)} (하루 ${n1(d.rate30)}개)` : ''}${d.trend != null ? ` → 최근 7일이 30일 평균보다 ${signPct(d.trend)}` : ''}${W.y.sold != null ? ` · 어제 ${cnt(W.y.sold)}` : ''}`]);
       if (d.cvr.d7 != null || d.cvr.d30 != null) rows.push(['구매 전환율', pct1(d.cvr.d7 != null ? d.cvr.d7 : d.cvr.d30), `${d.cvr.d7 != null ? `7일 조회 ${W.d7.views.toLocaleString('ko-KR')} → 구매 ${W.d7.sold}` : ''}${d.cvr.d30 != null ? ` · 30일 ${pct1(d.cvr.d30)} (조회 ${W.d30.views.toLocaleString('ko-KR')})` : ''}`]);
       if (d.bundleShare != null) rows.push(['번들 비중 (30일)', pct1(d.bundleShare), `단품 ${cnt(W.d30.single)} · 번들 ${cnt(W.d30.bundle)} — 묶음이 많이 팔리면 위 낱개 vs 묶음 표의 묶음 판매가를 실제 값으로 맞춰 보세요`]);
@@ -385,21 +384,24 @@
       if (d.reorderQty != null) rows.push(['다음 수입 발주', d.reorderQty > 0 ? cnt(d.reorderQty) : '아직 필요 없음', `${d.shortage > 0 ? `지금 발주해도 도착 전 ${n1(d.gapDays)}일 품절 · 못 파는 ${cnt(d.shortage)}${d.lostProfit != null ? ` = 놓치는 순이익 ${won(d.lostProfit)}` : ''} · ` : `리드타임 ${lead}일 안에 품절 없음 · `}리드타임 ${lead}일 + 여유 ${cover}일 = ${cnt(d.rate * (lead + cover))} 필요 − 재고 ${cnt(d.stock.total)}${W.stock.recommend != null ? ` · 쿠팡 입고권장 ${cnt(W.stock.recommend)}` : ''}`]);
       if (W.ret.rate != null) rows.push(['반품률', pct1(W.ret.rate / 100), `${W.ret.month != null ? `${W.ret.month}월 실측 · ` : ''}${F.ret.closest('.field').classList.contains('wing') ? '위 반품률 칸에 넣었어요 (카테고리 추정치 대신)' : '위 반품률 칸은 직접 고친 값이 우선입니다'}`]);
       if (W.cost.unit != null) {
-        const evList = ev.ok ? evaluate(FEES, { ...state(), price: String(list || I.price), disc: '0' }) : null;
-        const mine = evList && evList.ok ? evList.c.commission + evList.c.wh + evList.c.sh : null;
-        rows.push(['쿠팡 예상 비용 (개당)', won(W.cost.unit), mine != null ? `이 계산기의 판매수수료 + 입출고비 + 배송비 (표시가 기준) ${won(mine)} → 차이 ${signPct((mine - W.cost.unit) / W.cost.unit)}${Math.abs(mine - W.cost.unit) / W.cost.unit > 0.15 ? ' — 15% 넘게 다르면 카테고리·사이즈 유형이 실제와 다른지 확인하세요' : ' — 카테고리·사이즈가 실제와 맞는 편'}${W.cost.storageMonth != null ? ` · 이번달 누적보관비 ${won(W.cost.storageMonth)}` : ''}` : `카테고리·사이즈 유형을 넣으면 계산기 비용과 대조합니다${W.cost.storageMonth != null ? ` · 이번달 누적보관비 ${won(W.cost.storageMonth)}` : ''}`]);
+        const evB = ev.ok ? evaluate(FEES, { ...state(), price: String(basis), disc: '0' }) : null;
+        const mine = evB && evB.ok ? evB.c.commission + evB.c.wh + evB.c.sh : null;
+        const storageNote = W.cost.storageMonth != null ? ` · 이번달 누적보관비 ${won(W.cost.storageMonth)}` : '';
+        rows.push(['쿠팡 예상 비용 (개당)', won(W.cost.unit), mine == null ? `카테고리·사이즈 유형을 넣으면 계산기 비용과 대조합니다${storageNote}`
+          : `이 계산기의 판매수수료 + 입출고비 + 배송비 (${W.price.final ? '최종구매가' : '표시가'} ${won(basis)} 기준) ${won(mine)} → 차이 ${signPct((mine - W.cost.unit) / W.cost.unit)}${
+            tierOff && !catOff ? ` — 쿠팡 비용은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})과 맞는데 지금은 ${I.tier.name}으로 되어 있어요` : tierOff ? ` — 가장 가까운 유형은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})이지만 그래도 ${signPct(inf.gap)} 차이. 지금은 ${I.tier.name}이고, 카테고리(수수료율)도 실제 등록과 다른지 확인하세요` : catOff ? ' — 어느 사이즈 유형으로도 안 맞아요. 카테고리(수수료율)가 실제 등록과 다른지 확인하세요' : ' — 카테고리·사이즈가 실제와 맞아요'}${storageNote}`]);
       }
       const tbl = rows.map(([k, v, note]) => `<tr><th>${esc(k)}<small>${esc(note)}</small></th><td>${esc(v)}</td></tr>`).join('');
       const head = d.monthlyProfit != null
-        ? `<div class="sheet-num"><span class="num">${d.monthlyProfit < 0 ? '−' : ''}${Math.round(Math.abs(d.monthlyProfit)).toLocaleString('ko-KR')}</span><span class="pct">원/월</span></div><p class="sheet-title">지금 속도(하루 ${n1(d.rate)}개 · 월 ${cnt(d.monthlyUnits)}) × ${applied || disc == null ? '개당' : '30일 실판매가 기준 개당'} 순이익 ${perUnit < 0 ? '−' : ''}${won(Math.abs(perUnit))}${perUnit < 0 ? ' — 실판매가로는 적자입니다' : ''}</p>`
-        : d.rate != null ? `<p class="sheet-title">${d.asp.d30 != null ? `실판매가 ${won(d.asp.d30)} · ` : ''}하루 ${n1(d.rate)}개 (월 ${cnt(d.monthlyUnits)})</p><p class="sheet-text">위에 카테고리·판매가·사이즈 유형을 넣으면 월 순이익 전망과 품절로 놓치는 순이익까지 계산됩니다.</p>`
+        ? `<div class="sheet-num"><span class="num">${d.monthlyProfit < 0 ? '−' : ''}${Math.round(Math.abs(d.monthlyProfit)).toLocaleString('ko-KR')}</span><span class="pct">원/월</span></div><p class="sheet-title">지금 속도(하루 ${n1(d.rate)}개 · 월 ${cnt(d.monthlyUnits)}) × 개당 순이익 ${perUnit < 0 ? '−' : ''}${won(Math.abs(perUnit))}${perUnit < 0 ? ' — 지금 입력으로는 적자입니다' : ''}</p>`
+        : d.rate != null ? `<p class="sheet-title">하루 ${n1(d.rate)}개 (월 ${cnt(d.monthlyUnits)})</p><p class="sheet-text">위에 카테고리·판매가·사이즈 유형을 넣으면 월 순이익 전망과 품절로 놓치는 순이익까지 계산됩니다.</p>`
         : `<p class="sheet-title">최근 판매가 없어 속도·재고 예측은 못 합니다</p>`;
-      const apply = disc != null && !applied ? `<p class="sheet-actions"><button type="button" class="next alt rg-wing-apply">30일 실판매가로 다시 계산 — 판매가 ${won(list)} · 판매자 할인 ${disc}%</button></p>` : disc != null ? `<p class="sheet-text tip">위 계산은 30일 실판매가(표시가 ${won(list)} − 할인 ${disc}%)로 되어 있습니다.</p>` : '';
+      const apply = tierOff ? `<p class="sheet-actions"><button type="button" class="next alt rg-wing-tier">사이즈 유형을 ${RgCalc.SIZES[inf.i].name}으로 바꾸기</button></p>` : '';
       wingOut.innerHTML = `<section class="sheet ${tone}"><p class="sheet-label">${W.name ? esc(W.name) + ' · ' : ''}윙 실적 진단</p>${head}
         <div class="tbl-wrap"><table class="tbl mini rg"><tbody>${tbl}</tbody></table></div>${apply}
-        <p class="muted small basis">속도·재고 예측은 최근 7일 판매량(없으면 30일)이 이어진다는 가정입니다. 발주 수량 = 하루 판매량 × (리드타임 + 여유) − (판매가능 + 입고중). 쿠팡 예상 비용의 구성은 쿠팡이 공개하지 않아 판매수수료·입출고·배송비 합과 견줍니다.</p></section>`;
-      const ab = wingOut.querySelector('.rg-wing-apply');
-      if (ab) ab.addEventListener('click', () => { F.price.value = String(list); F.disc.value = String(disc); render(); out.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+        <p class="muted small basis">속도·재고 예측은 최근 7일 판매량(없으면 30일)이 이어진다는 가정입니다. 발주 수량 = 하루 판매량 × (리드타임 + 여유) − (판매가능 + 입고중). 쿠팡 예상 비용(개당)은 최종구매가 × 수수료율 + 입출고비 + 배송비와 원 단위로 맞아, 사이즈 유형·카테고리 검증에 씁니다.</p></section>`;
+      const tb = wingOut.querySelector('.rg-wing-tier');
+      if (tb) tb.addEventListener('click', () => { tierIdx = inf.i; sizeMode = 'tier'; showDims(false); render(); sizeBlock.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
     }
 
     load(o.key, o.ctx);

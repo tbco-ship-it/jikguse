@@ -5,8 +5,10 @@ import { dirname, join } from 'node:path';
 import assert from 'node:assert/strict';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+new Function(readFileSync(join(ROOT, 'static/rg-calc.js'), 'utf8'))();
 new Function(readFileSync(join(ROOT, 'static/rg-wing.js'), 'utf8'))();
-const { RgWing } = globalThis;
+const { RgWing, RgCalc } = globalThis;
+const FEES = JSON.parse(readFileSync(join(ROOT, 'data/rg_fees.json'), 'utf8'));
 const fx = f => readFileSync(join(ROOT, 'scripts/fixtures', f), 'utf8');
 const near = (a, b, eps = 0.01) => assert.ok(Math.abs(a - b) <= eps, `${a} ≠ ${b}`);
 let n = 0;
@@ -70,14 +72,34 @@ t('parse: garbage → not ok, missing lists what is absent', () => {
   const r = RgWing.parse('안녕하세요 배대지 신청서\n[620453] 치마 100개');
   assert.equal(r.ok, false); assert.ok(r.missing.includes('판매량(지난 7일·30일)'));
 });
-t('diagnose: 실판매가·속도·추세·전환율·번들 비중', () => {
+t('diagnose: 윙 매출 = 단품 × 표시가 (2026-09-21 실측) → 실판매가 없음, revIsList', () => {
   const { w } = RgWing.parse(fx('wing_row_real.txt'));
   const d = RgWing.diagnose(w, { lead: 25, cover: 30, perUnit: 1000 });
-  near(d.asp.y, 49000 / 3); near(d.asp.d7, 313600 / 43); near(d.asp.d30, 1617000 / 287);
-  near(d.discount, 1 - (1617000 / 287) / 9800, 1e-9);
+  assert.equal(d.asp, undefined); assert.equal(d.discount, undefined);
+  assert.equal(d.revIsList, true); assert.equal(d.revUnits, 165); near(d.revPerUnit, 9800, 1e-9);
   near(d.rate7, 43 / 7, 1e-9); near(d.rate30, 287 / 30, 1e-9); near(d.rate, 43 / 7, 1e-9); near(d.trend, (43 / 7) / (287 / 30) - 1, 1e-9);
   near(d.cvr.d7, 43 / 366, 1e-9); near(d.cvr.d30, 287 / 2419, 1e-9);
   near(d.bundleShare, 122 / 287, 1e-9);
+  // no 단품 breakdown (drag-copy) → sold is the unit count; a period whose 매출 differs from 판매량 × 표시가 → false
+  const { w: w2 } = RgWing.parse('지난 30일 10\n매출 79,000원\n판매가능 5\n판매가 7,900');
+  assert.equal(RgWing.diagnose(w2, {}).revIsList, true);
+  const { w: w3 } = RgWing.parse('지난 30일 10\n매출 70,000원\n판매가능 5\n판매가 7,900');
+  const d3 = RgWing.diagnose(w3, {}); assert.equal(d3.revIsList, false); near(d3.revPerUnit, 7000, 1e-9);
+  assert.equal(RgWing.diagnose(RgWing.parse('지난 30일 10\n판매가능 5\n판매가 7,900').w, {}).revIsList, null);
+  // drag-copy (no 단품 line): 1,617,000 = 165 × 9,800 exactly and 165 ≤ 287 → 단품 165 inferred, not '287개에 5,634원'
+  const dc = RgWing.diagnose(RgWing.parse(fx('wing_row_copy.txt')).w, {});
+  assert.equal(dc.revUnits, 165); assert.equal(dc.revInferred, true); assert.equal(dc.revIsList, true);
+  assert.equal(d.revInferred, false);
+});
+t('inferTier: 쿠팡 예상 비용 2,678 = 최종구매가 7,350 × 7.8% + 극소형 입출고 980 + 배송 1,125 (unit 68) → 극소형, 원 단위 일치', () => {
+  const r = RgWing.inferTier(2678, 7350, 7.8, FEES.units[68]);
+  assert.equal(r.i, 0); near(r.est, 2678.3, 1e-6); assert.ok(Math.abs(r.gap) < 0.001, String(r.gap));
+  assert.equal(r.ests.length, 6);
+  // the wrong category (10.8%, unit 50) still lands on the smallest tier but with a visible gap
+  const r2 = RgWing.inferTier(2678, 7350, 10.8, FEES.units[50]);
+  assert.equal(r2.i, 0); assert.ok(r2.gap > 0.05, String(r2.gap));
+  assert.equal(RgWing.inferTier(null, 7350, 7.8, FEES.units[68]), null);
+  assert.equal(RgWing.inferTier(2678, 0, 7.8, FEES.units[68]), null);
 });
 t('diagnose: 재고 소진·리드타임 부족분·추천 발주 (7일 속도 7개/일, 재고 206)', () => {
   const { w } = RgWing.parse('지난 7일 49\n지난 30일 294\n판매가능 9일 106\n입고중 100\n판매가 9,800');
@@ -95,6 +117,6 @@ t('diagnose: 재고 소진·리드타임 부족분·추천 발주 (7일 속도 7
 t('diagnose: no sales → no rates, nulls not NaN', () => {
   const { w } = RgWing.parse('지난 7일 0\n지난 30일 0\n판매가능 50\n판매가 10,000');
   const d = RgWing.diagnose(w, {});
-  assert.equal(d.rate, 0); assert.equal(d.daysTotal, null); assert.equal(d.reorderQty, null); assert.equal(d.asp.d30, null);
+  assert.equal(d.rate, 0); assert.equal(d.daysTotal, null); assert.equal(d.reorderQty, null); assert.equal(d.revIsList, null);
 });
 console.log(`${n} tests passed`);

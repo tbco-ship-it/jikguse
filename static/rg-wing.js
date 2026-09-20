@@ -2,7 +2,8 @@
 // loaded by rg-widget.js and scripts/test_wing.mjs.
 //   parse(text)        → { ok, w, missing }   w = 판매량(어제·7일·30일, 단품·번들, 매출, 조회수) · 재고(판매가능·입고중·입고권장) ·
 //                                              판매가(표시가·최종구매가) · 쿠팡 예상 비용(개당)·누적보관비 · 반품률(월)
-//   diagnose(w, opts)  → 실판매가, 판매 속도·추세, 전환율, 재고 소진일, 리드타임 대비 부족분·놓치는 순이익, 추천 발주 수량
+//   diagnose(w, opts)  → 판매 속도·추세, 전환율, 재고 소진일, 리드타임 대비 부족분·놓치는 순이익, 추천 발주 수량 (실판매가는 못 구한다 — 아래)
+//   inferTier(cost, basis, rate, table) → 쿠팡 예상 비용(개당)과 맞는 사이즈 유형
 // Labels are matched loosely (whitespace, ⓘ badges, '자동조정'·'할인' tags in between) because the copied text keeps the layout
 // only roughly; verified against the 2026-09-21 재고현황 list — innerText, a one-line tab copy, and a real drag-copy with the
 // 판매 상세 panel open (scripts/fixtures/wing_row_*.txt).
@@ -73,9 +74,16 @@
   // opts: lead(발주→입고 일), cover(리드타임 뒤 며칠치 더 두는지), perUnit(개당 순이익, 실판매가 기준, 없으면 null)
   function diagnose(w, opts) {
     const o = Object.assign({ lead: 25, cover: 30, perUnit: null }, opts || {});
-    const asp = k => w[k] && w[k].sold > 0 && w[k].rev != null ? w[k].rev / w[k].sold : null;
-    const d = { asp: { y: asp('y'), d7: asp('d7'), d30: asp('d30') } };
-    d.discount = w.price.list > 0 && d.asp.d30 != null ? 1 - d.asp.d30 / w.price.list : null; // 표시가 대비 실판매가 할인율
+    // 윙의 매출은 결제액이 아니라 단품 판매량 × 표시가다 (2026-09-21 실측: 1,617,000 = 단품 165 × 9,800, 313,600 = 32 × 9,800, 다른 상품
+    // 79,000 = 10 × 7,900) — 번들 판매분 매출과 최종구매가 할인이 빠져 있어 실판매가는 여기서 못 구한다. 그 공식과 맞는지만 알린다.
+    // A drag-copy loses the 단품·번들 split; when 매출 is an exact multiple of 표시가 within 판매량, that multiple is the 단품 count.
+    const d = {}, rv = w.d30, L = w.price.list;
+    let single = rv.single;
+    if (single == null && rv.rev > 0 && L > 0 && rv.rev % L === 0 && rv.rev / L <= rv.sold) single = rv.rev / L;
+    d.revUnits = single != null ? single : rv.sold;
+    d.revInferred = rv.single == null && single != null;
+    d.revPerUnit = rv.rev != null && d.revUnits > 0 ? rv.rev / d.revUnits : null;
+    d.revIsList = d.revPerUnit != null && L > 0 ? Math.abs(rv.rev - d.revUnits * L) <= Math.max(L, rv.rev * 0.01) : null;
     d.rate7 = w.d7.sold != null ? w.d7.sold / 7 : null;
     d.rate30 = w.d30.sold != null ? w.d30.sold / 30 : null;
     d.rate = d.rate7 != null ? d.rate7 : d.rate30;            // 예측엔 최근 7일 속도, 없으면 30일
@@ -99,5 +107,15 @@
     return d;
   }
 
-  root.RgWing = { parse, diagnose };
+  // 쿠팡 예상 비용(개당)을 요금표로 역산한다 — 실측: 2,678 = 최종구매가 7,350 × 7.8% + 극소형 입출고 980 + 배송 1,125 (원 단위 일치).
+  // basis = 최종구매가(없으면 표시가), rate = 카테고리 수수료 %, table = 요금 그룹. 여섯 유형 중 가장 가까운 것과 그 오차를 돌려준다.
+  function inferTier(costUnit, basis, rate, table) {
+    const C = root.RgCalc;
+    if (!C || !(costUnit > 0) || !(basis > 0) || !table || typeof rate !== 'number') return null;
+    const ests = C.SIZES.map((_, i) => basis * rate / 100 + C.lookup(table, 'wh', i, basis) + C.lookup(table, 'sh', i, basis));
+    let i = 0; ests.forEach((e, j) => { if (Math.abs(e - costUnit) < Math.abs(ests[i] - costUnit)) i = j; });
+    return { i, est: ests[i], gap: (ests[i] - costUnit) / costUnit, ests };
+  }
+
+  root.RgWing = { parse, diagnose, inferTier };
 })(typeof window !== 'undefined' ? window : globalThis);
