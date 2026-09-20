@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ item.name }} 직구 관세 계산 — 면세 한도, 세율, 예상 세금 (2026) | {{ site }}{% endblock %}
-{% block description %}{{ item.name }} 해외직구 시 {{ '목록통관 가능' if not item.excluded else '목록통관 불가(일반통관)' }}. 세율 {% if item.group == 'alcohol' %}관세 {{ item.duty|pct }} + 주세·교육세·부가세{% elif item.group == 'tobacco' %}담배 세목 별도(관세 40% + 개별소비세·담배소비세·지방교육세·부가세){% elif item.duty == 0 %}관세 0% + 부가세 10%{% else %}관세 {{ item.duty|pct }} + 부가세 10%{% endif %}. 이번 주 과세환율로 계산한 가격대별 예상 세금.{% endblock %}
+{% set et = (ex|rejectattr('r.exempt')|list)|first %}
+{% block title %}{{ item.name }} 직구 관세 계산 — {% if et %}${{ et.price|int }}짜리 사면 세금 약 {{ et.r.tax_total|won_k }}, {% endif %}면세 한도 {{ '150' if item.excluded else '150/200' }}달러 · {% if item.group == 'alcohol' %}관세 {{ item.duty|pct }}+주세{% elif item.group == 'tobacco' %}담배 세목{% else %}관세 {{ item.duty|pct }}+부가세 10%{% endif %} (2026년 {{ fx.applies_from[5:7]|int }}월 환율) | {{ site }}{% endblock %}
+{% block description %}{{ item.name }} 해외직구 시 {{ '목록통관 가능' if not item.excluded else '목록통관 불가(일반통관)' }}. 세율 {% if item.group == 'alcohol' %}관세 {{ item.duty|pct }} + 주세·교육세·부가세{% elif item.group == 'tobacco' %}담배 세목 별도(관세 40% + 개별소비세·담배소비세·지방교육세·부가세){% elif item.duty == 0 %}관세 0% + 부가세 10%{% else %}관세 {{ item.duty|pct }} + 부가세 10%{% endif %}. {% if et %}예: 미국에서 ${{ et.price|int }}짜리(배송비 ${{ et.ship|int }})를 사면 세금 약 {{ et.r.tax_total|won_k }}, 총 {{ et.r.total|won_k }}. {% endif %}이번 주 관세청 과세환율({{ fx.applies_from[5:] }}~{{ fx.applies_to[5:] }}) 기준, 관세청 계산기와 대조 검증.{% endblock %}
 {% block head %}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
 {"@type":"Question","name":"{{ item.name }} 직구는 얼마까지 면세인가요?","acceptedAnswer":{"@type":"Answer","text":"물품 가격(배송비 제외) 기준 미화 150달러까지 면세입니다.{% if not item.excluded %} 미국에서 특송으로 오면 200달러까지 목록통관으로 면세됩니다.{% else %} {{ item.name }}은(는) 목록통관 배제 품목이라 미국발이어도 150달러가 기준이고 수입신고(일반통관)를 거칩니다.{% endif %} 한도를 넘으면 전체 금액에 과세됩니다."}},

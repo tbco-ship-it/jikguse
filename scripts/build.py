@@ -52,6 +52,7 @@ def main():
 
     env = Environment(loader=FileSystemLoader(ROOT / "templates"), autoescape=select_autoescape(["html"]))
     env.filters["won"] = won
+    env.filters["won_k"] = lambda n: won(round(n, -3))  # '약 155,000원' in titles — an exact-looking 155,016 next to '약' reads wrong
     env.filters["pct"] = lambda r: f"{r * 100:g}%"
     env.globals.update(site=SITE, base=base, origin=origin, today=date.today().isoformat(), v=v,
                        adsense_pub=args.adsense_pub, items=items, countries=countries, fx=fx, rules=RULES)
