@@ -387,13 +387,17 @@
       // 어느 (수수료율 · 요금 그룹 · 유형)이 쿠팡 비용을 원 단위로 재현하는지 — 카테고리 목록이 아직이면 받아 온 뒤 다시 그린다
       if (ev.ok && W.cost.unit != null && !CATS) catsReady().then(() => render());
       const fix = ev.ok && W.cost.unit != null && CATS ? RgWing.inferFees(W.cost.unit, basis, FEES, CATS, W.name) : null;
-      const fixTier = fix ? fix.tierIdx : inf ? inf.i : null;
+      const otherProduct = list > 0 && I.price > 0 && Math.abs(I.price - list) > 1 && (W.price.final == null || Math.abs(I.price - W.price.final) > 1);
+      const fixTier = otherProduct ? null : fix ? fix.tierIdx : inf ? inf.i : null; // 다른 상품의 쿠팡 비용으로 이 품목의 유형·카테고리를 고치지 않는다
       const tierOff = fixTier != null && fixTier !== I.tier.i; // 쿠팡 비용과 맞는 유형이 지금 고른 유형이 아니다
-      const rateOff = !!fix && (fix.rate !== cat.r || !fix.units.includes(cat.u)); // 수수료율(카테고리)이 쿠팡 등록과 다르다
+      const rateOff = !!fix && !otherProduct && (fix.rate !== cat.r || !fix.units.includes(cat.u)); // 수수료율(카테고리)이 쿠팡 등록과 다르다
       const fixCat = rateOff && fix.cat ? fix.cat : null;
-      const catOff = fix ? rateOff : !!inf && Math.abs(inf.gap) > 0.15; // 원 단위 재현이 안 되면 15% 넘게 어긋날 때만 의심
+      const catOff = otherProduct ? false : fix ? rateOff : !!inf && Math.abs(inf.gap) > 0.15; // 원 단위 재현이 안 되면 15% 넘게 어긋날 때만 의심
       // 쿠팡이 실제로 매기는 비용 기준으로 다시 계산한 개당·월 순이익 — 사용자가 고른 값과 다르면 이걸 머리에 세운다
       const dc = wingDisc();
+      // 붙여넣은 윙 상품의 표시가와 이 품목의 판매가가 다르면 다른 상품의 화면이다 (2026-09-21: 마스크 화면을 치마 품목에 붙여 25% 할인이 13,900원에 걸렸다).
+      // 윙에서 자동으로 넣은 할인(값이 윙 할인과 같을 때만)은 그 표시가에만 뜻이 있으니 지우고, 나머지는 경고 + 지우기 버튼으로 맡긴다.
+      if (otherProduct && dc != null && numv(F.disc.value) === dc) { F.disc.value = '0'; render(); return; }
       const soldNow = I.price * (1 - I.sellerDisc / 100), doubleDisc = W.price.final != null && I.sellerDisc > 0 && soldNow < W.price.final - 1; // 최종구매가 위에 할인을 또 건 상태
       const evFix = tierOff || fixCat || (doubleDisc && dc != null) ? evaluate(FEES, { ...state(), sizeMode: 'tier', tierIdx: fixTier != null ? fixTier : I.tier.i, cat: fixCat || cat, ...(doubleDisc && dc != null ? { price: String(list), disc: String(dc) } : {}) }) : null;
       const perUnitFix = evFix && evFix.ok ? evFix.c.expected : null;
@@ -431,9 +435,12 @@
         : `<p class="sheet-title">최근 판매가 없어 속도·재고 예측은 못 합니다</p>`;
       const ro = w => { const c = w.charCodeAt(w.length - 1); if (c < 0xac00 || c > 0xd7a3) return /[0-9]$/.test(w) ? (/[136780]$/.test(w) ? '으로' : '로') : '로'; const f = (c - 0xac00) % 28; return f === 0 || f === 8 ? '로' : '으로'; };
       const apply = evFix ? `<p class="sheet-actions"><button type="button" class="next alt rg-wing-tier">${fixLabel}${ro(fixCat ? fixCat.leaf : tierOff ? RgCalc.SIZES[fixTier].name : '%')} 바꾸기</button></p>` : '';
-      wingOut.innerHTML = `<section class="sheet ${tone}"><p class="sheet-label">${W.name ? esc(W.name) + ' · ' : ''}윙 실적 진단</p>${head}
+      const other = otherProduct ? `<p class="sheet-text"><strong>⚠ 붙여넣은 윙 화면은 표시가 ${won(list)} 상품인데 이 품목 판매가는 ${won(I.price)}입니다</strong> — 다른 상품의 화면이면 아래 진단(월 판매량·반품률 자동 입력 포함)은 이 품목에 맞지 않아요. <button type="button" class="link-btn rg-wing-drop">이 품목에서 윙 진단 지우기</button></p>` : '';
+      wingOut.innerHTML = `<section class="sheet ${tone}"><p class="sheet-label">${W.name ? esc(W.name) + ' · ' : ''}윙 실적 진단</p>${other}${head}
         <div class="tbl-wrap"><table class="tbl mini rg"><tbody>${tbl}</tbody></table></div>${apply}
         <p class="muted small basis">속도·재고 예측은 최근 7일 판매량(없으면 30일)이 이어진다는 가정입니다. 발주 수량 = 하루 판매량 × (리드타임 + 여유) − (판매가능 + 입고중). 월 순이익 = 지난 30일 실제 판매량 × 개당 순이익(반품 반영, 부가세 별도). 쿠팡 예상 비용(개당)은 최종구매가 × 수수료율 + 입출고비 + 배송비와 원 단위로 맞아, 사이즈 유형·카테고리 검증에 씁니다.</p></section>`;
+      const db = wingOut.querySelector('.rg-wing-drop');
+      if (db) db.addEventListener('click', () => { const m = wingMonthly(), r = wingRet(); if (m != null && F.monthly.value === String(m)) F.monthly.value = DEFAULTS.monthly; if (r != null && numv(F.ret.value) === r) { F.ret.value = cat ? String(RgCalc.returnDefault(cat.p) * 100) : ''; retTouched = false; } wingIn.value = ''; W = null; wingNote.textContent = ''; render(); });
       const tb = wingOut.querySelector('.rg-wing-tier');
       if (tb) tb.addEventListener('click', () => {
         if (doubleDisc && dc != null) { F.price.value = String(list); F.disc.value = String(dc); wingPriceNote = ''; }
