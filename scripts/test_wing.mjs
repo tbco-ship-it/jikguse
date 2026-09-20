@@ -108,11 +108,25 @@ t('diagnose: 재고 소진·리드타임 부족분·추천 발주 (7일 속도 7
   near(d.daysAvail, 106 / 7, 1e-9); near(d.daysTotal, 206 / 7, 1e-9);
   near(d.leadDemand, 175); assert.equal(d.shortage, 0); assert.equal(d.gapDays, 0); assert.equal(d.lostProfit, 0);
   assert.equal(d.reorderQty, Math.ceil(7 * 55 - 206)); // 179
-  near(d.monthlyUnits, 210); near(d.monthlyProfit, 210000);
+  // 월 순이익은 실제 지난 30일 판매량 × 개당 (2026-09-21: 7일 속도 184개로 잡아 "월 300개 파는데 15만 원?"이 됐다) · 7일 속도 환산은 pace
+  near(d.monthlyUnits, 294); near(d.monthlyProfit, 294000); near(d.paceUnits, 210); near(d.paceProfit, 210000);
+  const d7 = RgWing.diagnose(RgWing.parse('지난 7일 49\n판매가능 106\n판매가 9,800').w, { perUnit: 1000 });
+  near(d7.monthlyUnits, 210); near(d7.monthlyProfit, 210000); // 30일 값이 없으면 속도 환산
   // longer lead time than the stock lasts → shortage and lost profit
   const d2 = RgWing.diagnose(w, { lead: 40, cover: 30, perUnit: 1000 });
   assert.equal(d2.shortage, Math.ceil(7 * 40 - 206)); // 74
   near(d2.gapDays, 40 - 206 / 7, 1e-9); assert.equal(d2.lostProfit, 74000);
+});
+t('inferFees: 쿠팡 예상 비용 2,678 @ 7,350 은 수수료 7.8% · 극소형 조합에서만 원 단위로 나온다 → 상품명과 맞는 그 수수료의 카테고리 추천', () => {
+  const CATS = JSON.parse(readFileSync(join(ROOT, 'data/rg_cats.json'), 'utf8')).cats.map(c => ({ p: c[0], r: c[1], u: c[2], leaf: c[0].split('>').pop() }));
+  const f = RgWing.inferFees(2678, 7350, FEES, CATS, '코스토프 투명스모그라이딩마스크 김서림 방지 전면 방호마스크 + 고급안경닦이 증정');
+  assert.equal(f.rate, 7.8); assert.equal(f.tierIdx, 0); assert.ok(f.units.includes(68), String(f.units));
+  assert.equal(f.cat.leaf, '투명위생마스크'); assert.equal(f.cat.r, 7.8); assert.ok(f.units.includes(f.cat.u));
+  // several rates would fit → ambiguous → no rate; no name overlap → no cat
+  const g = RgWing.inferFees(2678, 7350, FEES, CATS, '무선 이어폰');
+  assert.equal(g.rate, 7.8); assert.equal(g.cat, null);
+  assert.equal(RgWing.inferFees(1234.56, 7350, FEES, CATS, 'x'), null); // 어느 조합으로도 안 맞음
+  assert.equal(RgWing.inferFees(null, 7350, FEES, CATS, 'x'), null);
 });
 t('diagnose: no sales → no rates, nulls not NaN', () => {
   const { w } = RgWing.parse('지난 7일 0\n지난 30일 0\n판매가능 50\n판매가 10,000');

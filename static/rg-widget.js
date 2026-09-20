@@ -377,9 +377,21 @@
       const d = RgWing.diagnose(W, { lead, cover, perUnit });
       // 사이즈 유형·카테고리 대조: 쿠팡 예상 비용을 이 카테고리 요금표로 역산해 가장 가까운 유형을 찾는다
       const inf = ev.ok && W.cost.unit != null ? RgWing.inferTier(W.cost.unit, basis, cat.r, unitOf(cat)) : null;
-      const tierOff = inf && inf.i !== I.tier.i; // 쿠팡 비용에 가장 가까운 유형이 지금 고른 유형이 아니다
-      const catOff = inf && Math.abs(inf.gap) > 0.15; // 어느 유형으로도 안 맞으면 수수료율(카테고리)이 다르다
-      const tone = perUnit != null && perUnit < 0 ? 'severe' : tierOff || catOff || (d.shortage > 0) || (d.trend != null && d.trend < -0.3) ? 'moderate' : 'balanced';
+      // 어느 (수수료율 · 요금 그룹 · 유형)이 쿠팡 비용을 원 단위로 재현하는지 — 카테고리 목록이 아직이면 받아 온 뒤 다시 그린다
+      if (ev.ok && W.cost.unit != null && !CATS) catsReady().then(() => render());
+      const fix = ev.ok && W.cost.unit != null && CATS ? RgWing.inferFees(W.cost.unit, basis, FEES, CATS, W.name) : null;
+      const fixTier = fix ? fix.tierIdx : inf ? inf.i : null;
+      const tierOff = fixTier != null && fixTier !== I.tier.i; // 쿠팡 비용과 맞는 유형이 지금 고른 유형이 아니다
+      const rateOff = !!fix && (fix.rate !== cat.r || !fix.units.includes(cat.u)); // 수수료율(카테고리)이 쿠팡 등록과 다르다
+      const fixCat = rateOff && fix.cat ? fix.cat : null;
+      const catOff = fix ? rateOff : !!inf && Math.abs(inf.gap) > 0.15; // 원 단위 재현이 안 되면 15% 넘게 어긋날 때만 의심
+      // 쿠팡이 실제로 매기는 비용 기준으로 다시 계산한 개당·월 순이익 — 사용자가 고른 값과 다르면 이걸 머리에 세운다
+      const evFix = tierOff || fixCat ? evaluate(FEES, { ...state(), sizeMode: 'tier', tierIdx: fixTier != null ? fixTier : I.tier.i, cat: fixCat || cat }) : null;
+      const perUnitFix = evFix && evFix.ok ? evFix.c.expected : null;
+      const dFix = perUnitFix != null ? RgWing.diagnose(W, { lead, cover, perUnit: perUnitFix }) : null;
+      const fixLabel = [tierOff ? RgCalc.SIZES[fixTier].name : null, fixCat ? `${fixCat.leaf}(${fixCat.r}%)` : null].filter(Boolean).join(' · ');
+      const nowLabel = `${I.tier.name} · ${cat.leaf}(${cat.r}%)`;
+      const tone = (perUnitFix != null ? perUnitFix : perUnit) != null && (perUnitFix != null ? perUnitFix : perUnit) < 0 ? 'severe' : tierOff || catOff || (d.shortage > 0) || (d.trend != null && d.trend < -0.3) ? 'moderate' : 'balanced';
       const rows = [];
       const dc = wingDisc();
       if (list) rows.push(['판매가', won(list), `${dc != null ? `최종구매가 ${won(W.price.final)} = 판매자 할인 ${dc}% (정산에서 '판매자 할인쿠폰'으로 빠지는 판매자 부담) → ${numv(F.disc.value) === dc ? '위 판매자 즉시할인 칸에 넣었어요' : '위 판매자 즉시할인 칸은 직접 고친 값이 우선입니다'} · ` : ''}${d.revIsList === true ? `윙 매출 ${won(W.d30.rev)} = 단품 ${cnt(d.revUnits)}${d.revInferred ? '(역산)' : ''} × 표시가 — 할인·번들 매출은 이 집계에 없어 실판매가는 못 구합니다` : d.revIsList === false ? `윙 매출 ${won(W.d30.rev)} ÷ ${cnt(d.revUnits)} = ${won(d.revPerUnit)} — 윙 매출은 단품 판매분만 표시가로 집계해서 번들이 섞이면 낮게 나옵니다. 실판매가로 쓰지 마세요` : '매출 박스가 없어요'}`]);
@@ -395,19 +407,31 @@
         const storageNote = W.cost.storageMonth != null ? ` · 이번달 누적보관비 ${won(W.cost.storageMonth)}` : '';
         rows.push(['쿠팡 예상 비용 (개당)', won(W.cost.unit), mine == null ? `카테고리·사이즈 유형을 넣으면 계산기 비용과 대조합니다${storageNote}`
           : `이 계산기의 판매수수료 + 입출고비 + 배송비 (${W.price.final ? '최종구매가' : '표시가'} ${won(basis)} 기준) ${won(mine)} → 차이 ${signPct((mine - W.cost.unit) / W.cost.unit)}${
-            tierOff && !catOff ? ` — 쿠팡 비용은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})과 맞는데 지금은 ${I.tier.name}으로 되어 있어요` : tierOff ? ` — 가장 가까운 유형은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})이지만 그래도 ${signPct(inf.gap)} 차이. 지금은 ${I.tier.name}이고, 카테고리(수수료율)도 실제 등록과 다른지 확인하세요` : catOff ? ' — 어느 사이즈 유형으로도 안 맞아요. 카테고리(수수료율)가 실제 등록과 다른지 확인하세요' : ' — 카테고리·사이즈가 실제와 맞아요'}${storageNote}`]);
+            fix ? ` — 쿠팡 비용은 수수료 ${fix.rate}% × ${won(basis)} + ${RgCalc.SIZES[fix.tierIdx].name} 입출고·배송비로 원 단위까지 맞아요${tierOff || rateOff ? `. 지금은 ${nowLabel}${rateOff && !fixCat ? ` — 위 카테고리 칸에서 수수료 ${fix.rate}% 카테고리를 골라 주세요` : ''}` : ' · 카테고리·사이즈가 실제와 맞아요'}`
+            : tierOff && !catOff ? ` — 쿠팡 비용은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})과 맞는데 지금은 ${I.tier.name}으로 되어 있어요` : tierOff ? ` — 가장 가까운 유형은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})이지만 그래도 ${signPct(inf.gap)} 차이. 지금은 ${I.tier.name}이고, 카테고리(수수료율)도 실제 등록과 다른지 확인하세요` : catOff ? ' — 어느 사이즈 유형으로도 안 맞아요. 카테고리(수수료율)가 실제 등록과 다른지 확인하세요' : ' — 카테고리·사이즈가 실제와 맞아요'}${storageNote}`]);
       }
       const tbl = rows.map(([k, v, note]) => `<tr><th>${esc(k)}<small>${esc(note)}</small></th><td>${esc(v)}</td></tr>`).join('');
-      const head = d.monthlyProfit != null
-        ? `<div class="sheet-num"><span class="num">${d.monthlyProfit < 0 ? '−' : ''}${Math.round(Math.abs(d.monthlyProfit)).toLocaleString('ko-KR')}</span><span class="pct">원/월</span></div><p class="sheet-title">지금 속도(하루 ${n1(d.rate)}개 · 월 ${cnt(d.monthlyUnits)}) × 개당 순이익 ${perUnit < 0 ? '−' : ''}${won(Math.abs(perUnit))}${perUnit < 0 ? ' — 지금 입력으로는 적자입니다' : ''}</p>`
+      // 머리 숫자: 쿠팡 비용과 맞는 설정(dFix)이 있으면 그것, 아니면 지금 입력(d). 월 = 지난 30일 실제 판매량 × 개당, 7일 속도 환산은 따로.
+      const H = dFix || d, pu = dFix ? perUnitFix : perUnit;
+      const signed = v => `${v < 0 ? '−' : ''}${won(Math.abs(v))}`;
+      const monthLine = D => `${W.d30.sold != null ? `지난 30일 ${cnt(W.d30.sold)}` : `하루 ${n1(D.rate)}개 × 30일`} × 개당 순이익 ${signed(D === dFix ? perUnitFix : perUnit)}`;
+      const paceLine = D => D.paceProfit != null && W.d30.sold != null && Math.round(D.paceUnits) !== Math.round(D.monthlyUnits) ? ` · 최근 7일 속도(하루 ${n1(D.rate)}개)가 이어지면 월 ${cnt(D.paceUnits)} → ${signed(D.paceProfit)}` : '';
+      const head = H.monthlyProfit != null
+        ? `<div class="sheet-num"><span class="num">${H.monthlyProfit < 0 ? '−' : ''}${Math.round(Math.abs(H.monthlyProfit)).toLocaleString('ko-KR')}</span><span class="pct">원/월</span></div><p class="sheet-title">${dFix ? `쿠팡 예상 비용과 맞는 ${fixLabel} 기준 · ` : ''}${monthLine(H)}${pu < 0 ? ' — 적자입니다' : ''}${paceLine(H)}</p>${
+            dFix ? `<p class="sheet-text"><strong>지금 고른 ${nowLabel}으로는 개당 ${signed(perUnit)} → 월 ${signed(d.monthlyProfit)}</strong> — 쿠팡이 이 상품에 매기는 비용(${won(W.cost.unit)})과 안 맞아요. 아래 버튼으로 바꾸면 위 계산기도 같은 숫자가 됩니다.</p>` : ''}`
         : d.rate != null ? `<p class="sheet-title">하루 ${n1(d.rate)}개 (월 ${cnt(d.monthlyUnits)})</p><p class="sheet-text">위에 카테고리·판매가·사이즈 유형을 넣으면 월 순이익 전망과 품절로 놓치는 순이익까지 계산됩니다.</p>`
         : `<p class="sheet-title">최근 판매가 없어 속도·재고 예측은 못 합니다</p>`;
-      const apply = tierOff ? `<p class="sheet-actions"><button type="button" class="next alt rg-wing-tier">사이즈 유형을 ${RgCalc.SIZES[inf.i].name}으로 바꾸기</button></p>` : '';
+      const ro = w => { const c = w.charCodeAt(w.length - 1); if (c < 0xac00 || c > 0xd7a3) return /[0-9]$/.test(w) ? (/[136780]$/.test(w) ? '으로' : '로') : '로'; const f = (c - 0xac00) % 28; return f === 0 || f === 8 ? '로' : '으로'; };
+      const apply = tierOff || fixCat ? `<p class="sheet-actions"><button type="button" class="next alt rg-wing-tier">${fixLabel}${ro(fixCat ? fixCat.leaf : RgCalc.SIZES[fixTier].name)} 바꾸기</button></p>` : '';
       wingOut.innerHTML = `<section class="sheet ${tone}"><p class="sheet-label">${W.name ? esc(W.name) + ' · ' : ''}윙 실적 진단</p>${head}
         <div class="tbl-wrap"><table class="tbl mini rg"><tbody>${tbl}</tbody></table></div>${apply}
-        <p class="muted small basis">속도·재고 예측은 최근 7일 판매량(없으면 30일)이 이어진다는 가정입니다. 발주 수량 = 하루 판매량 × (리드타임 + 여유) − (판매가능 + 입고중). 쿠팡 예상 비용(개당)은 최종구매가 × 수수료율 + 입출고비 + 배송비와 원 단위로 맞아, 사이즈 유형·카테고리 검증에 씁니다.</p></section>`;
+        <p class="muted small basis">속도·재고 예측은 최근 7일 판매량(없으면 30일)이 이어진다는 가정입니다. 발주 수량 = 하루 판매량 × (리드타임 + 여유) − (판매가능 + 입고중). 월 순이익 = 지난 30일 실제 판매량 × 개당 순이익(반품 반영, 부가세 별도). 쿠팡 예상 비용(개당)은 최종구매가 × 수수료율 + 입출고비 + 배송비와 원 단위로 맞아, 사이즈 유형·카테고리 검증에 씁니다.</p></section>`;
       const tb = wingOut.querySelector('.rg-wing-tier');
-      if (tb) tb.addEventListener('click', () => { tierIdx = inf.i; sizeMode = 'tier'; showDims(false); render(); sizeBlock.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+      if (tb) tb.addEventListener('click', () => {
+        if (tierOff) { tierIdx = fixTier; sizeMode = 'tier'; showDims(false); }
+        if (fixCat) choose(fixCat); else render();
+        (fixCat ? catField : sizeBlock).scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     }
 
     load(o.key, o.ctx);

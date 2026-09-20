@@ -101,9 +101,12 @@
       d.gapDays = Math.max(0, o.lead - d.daysTotal);
       d.lostProfit = o.perUnit != null ? d.shortage * o.perUnit : null;
       d.reorderQty = Math.max(0, Math.ceil(d.rate * (o.lead + o.cover) - total));
-      d.monthlyUnits = d.rate * 30;
-      d.monthlyProfit = o.perUnit != null ? d.monthlyUnits * o.perUnit : null;
-    } else { d.daysAvail = d.daysTotal = d.leadDemand = d.shortage = d.gapDays = d.reorderQty = d.monthlyUnits = null; d.lostProfit = d.monthlyProfit = null; }
+      d.paceUnits = d.rate * 30;                                    // 최근 7일 속도가 이어질 때의 한 달
+      d.paceProfit = o.perUnit != null ? d.paceUnits * o.perUnit : null;
+    } else { d.daysAvail = d.daysTotal = d.leadDemand = d.shortage = d.gapDays = d.reorderQty = d.paceUnits = null; d.lostProfit = d.paceProfit = null; }
+    // 월 순이익은 실제로 판 지난 30일 수량 × 개당 — 7일 속도로 환산하면 "월 300개 파는데 15만 원?"이 된다 (2026-09-21). 30일 값이 없을 때만 속도 환산.
+    d.monthlyUnits = w.d30.sold != null ? w.d30.sold : d.paceUnits;
+    d.monthlyProfit = o.perUnit != null && d.monthlyUnits != null ? d.monthlyUnits * o.perUnit : null;
     return d;
   }
 
@@ -117,5 +120,32 @@
     return { i, est: ests[i], gap: (ests[i] - costUnit) / costUnit, ests };
   }
 
-  root.RgWing = { parse, diagnose, inferTier };
+  // 쿠팡 예상 비용이 어느 (수수료율 · 요금 그룹 · 유형) 조합에서 원 단위로 나오는지 찾는다 — 2,678 @ 7,350 은 7.8% · 극소형 뿐(요금 그룹 12개가 같은 값).
+  // 수수료율과 유형이 하나로 정해지면 그 수수료의 카테고리 중 상품명과 겹치는 잎(2글자 조각이 가장 많이 겹치는 것)을 추천한다. 같은 수수료·요금 그룹이면 어느 잎이든 계산은 같다.
+  function inferFees(costUnit, basis, FEES, cats, name) {
+    const C = root.RgCalc;
+    if (!C || !(costUnit > 0) || !(basis > 0) || !FEES || !cats) return null;
+    const combos = new Map();
+    for (const c of cats) { const k = `${c.r}|${c.u}`; if (!combos.has(k) && FEES.units[c.u]) combos.set(k, { r: c.r, u: c.u }); }
+    const hits = [];
+    for (const c of combos.values()) {
+      const inf = inferTier(costUnit, basis, c.r, FEES.units[c.u]);
+      if (inf) inf.ests.forEach((e, i) => { if (Math.abs(e - costUnit) <= 1) hits.push({ r: c.r, u: c.u, i }); });
+    }
+    if (!hits.length) return null;
+    const rates = [...new Set(hits.map(h => h.r))], tiers = [...new Set(hits.map(h => h.i))];
+    if (rates.length !== 1 || tiers.length !== 1) return null;                // 여러 조합이 맞으면 단정하지 않는다
+    const units = [...new Set(hits.map(h => h.u))];
+    const nm = String(name || '').replace(/\s+/g, '');
+    let cat = null, best = 0;
+    for (const c of cats) {
+      if (c.r !== rates[0] || !units.includes(c.u)) continue;
+      const leaf = c.leaf.replace(/\s+/g, ''); let sc = 0;
+      for (let k = 0; k + 2 <= leaf.length; k++) if (/[가-힣a-z0-9]{2}/i.test(leaf.slice(k, k + 2)) && nm.includes(leaf.slice(k, k + 2))) sc++;
+      if (sc > best) { best = sc; cat = c; }
+    }
+    return { rate: rates[0], tierIdx: tiers[0], units, cat };
+  }
+
+  root.RgWing = { parse, diagnose, inferTier, inferFees };
 })(typeof window !== 'undefined' ? window : globalThis);
