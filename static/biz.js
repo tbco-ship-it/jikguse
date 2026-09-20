@@ -268,7 +268,8 @@
         `관세 ${won(r.duty)} + 부가세 ${won(r.vat)} = ${won(r.tax)} · 총 착지비용 ${won(r.landed)} (부가세 공제 후 ${won(r.landedNet)})`, `※ 예상치. 신고 책임은 신고인, 관세사 확인 권장.`].join('\n');
       navigator.clipboard.writeText(txt).then(() => { $('copy').textContent = '복사했어요'; setTimeout(() => { $('copy').textContent = '결과 텍스트 복사'; }, 1500); });
     });
-    rgItems = r.lines.map(l => ({ id: idOf(l), hs: l.entry.c, name: l.name || nameOf(l.entry), query: l.name || '', cost: unitCost(l) }));
+    rgItems = r.lines.map(l => ({ id: idOf(l), hs: l.entry.c, name: l.name || nameOf(l.entry), query: l.name || '', cost: unitCost(l), qty: l.qty }));
+    rgOutlay = r.landedNet;
     $('rg-open').addEventListener('click', () => openRg());
     out.querySelectorAll('.rg-link').forEach(b => b.addEventListener('click', () => openRg(b.dataset.id)));
     if (!$('rg-panel').hidden) syncRg();
@@ -280,17 +281,43 @@
     });
   }
 
-  // ----- 로켓그로스 panel: the same widget as /rocket/, fed the per-line landed unit cost. One saved slot per HS code. -----
-  let rgItems = [], rgW = null, rgId = null;
-  const rgHost = $('rg-host'), rgChips = $('rg-chips');
-  const rgReady = () => rgW ? Promise.resolve(rgW) : fetch(rgHost.dataset.fees).then(r => r.json()).then(fees => (rgW = window.RgWidget.mount(rgHost, { fees, catsUrl: rgHost.dataset.cats, base, key: null, embedded: true })));
+  // ----- 로켓그로스 panel: the same widget as /rocket/, fed the per-line landed unit cost. One saved slot per HS:price line. -----
+  let rgItems = [], rgW = null, rgId = null, rgFees = null, rgOutlay = 0;
+  const rgHost = $('rg-host'), rgChips = $('rg-chips'), rgTotal = $('rg-total');
+  const rgReady = () => rgW ? Promise.resolve(rgW) : fetch(rgHost.dataset.fees).then(r => r.json()).then(fees => { rgFees = fees; return (rgW = window.RgWidget.mount(rgHost, { fees, catsUrl: rgHost.dataset.cats, base, key: null, embedded: true, onChange: renderTotal })); });
+  const slotOf = it => { try { return JSON.parse(localStorage.getItem(KEY + '.rg.' + it.id)); } catch (e) { return null; } };
+  const evalItem = it => rgFees ? window.RgWidget.evaluate(rgFees, slotOf(it), { cost: it.cost }) : { ok: false };
   function syncRg() {
     if (!rgItems.some(i => i.id === rgId)) rgId = rgItems.length ? rgItems[0].id : null;
-    rgChips.innerHTML = rgItems.map(i => `<button type="button" class="chip${i.id === rgId ? ' on' : ''}" role="tab" aria-selected="${i.id === rgId}" data-id="${esc(i.id)}" title="${esc(i.name)}"><span>${esc(i.name)}</span><small>개당 ${won(i.cost)}</small></button>`).join('');
+    rgChips.innerHTML = rgItems.map(i => { const ev = evalItem(i); return `<button type="button" class="chip${i.id === rgId ? ' on' : ''}${ev.ok ? ' done' : ''}" role="tab" aria-selected="${i.id === rgId}" data-id="${esc(i.id)}" title="${esc(i.name)}"><span>${esc(i.name)}</span><small>개당 ${won(i.cost)}${ev.ok ? ` → 순이익 <b class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected)}</b>` : ' · 입력 전'}</small></button>`; }).join('');
     rgChips.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => { rgId = b.dataset.id; syncRg(); }));
     const it = rgItems.find(i => i.id === rgId);
     // query = the sheet's 품명 → the widget matches a Coupang category from it when none is saved for this slot
     if (it && rgW) rgW.load(KEY + '.rg.' + it.id, { cost: it.cost, name: it.name, query: it.query, hs: it.hs, note: `${it.name} 개당 원가 ${won(it.cost)} — 위 수입 계산에서 가져옴 (물품가 + 관세 + 운임·부가서비스 안분, 부가세 제외). 위 수입 계산이 바뀌면 같이 바뀝니다.` });
+    else renderTotal();
+  }
+  // Whole-shipment view: every item's saved slot × its sheet quantity. Each sale returns 원가 + 순이익 in cash, so the payback point is
+  // Σ 원가·수량 ÷ Σ (원가+순이익)·수량 of the shipment (items sell in proportion). Items without inputs are listed, not summed.
+  function renderTotal() {
+    if (!rgItems.length || !rgFees) { rgTotal.hidden = true; return; }
+    const rows = rgItems.map(it => ({ it, ev: evalItem(it) }));
+    const done = rows.filter(r => r.ev.ok), todo = rows.length - done.length;
+    const sum = f => done.reduce((s, r) => s + f(r), 0);
+    const profit = sum(r => r.ev.c.expected * r.it.qty), revenue = sum(r => r.ev.c.sold * r.it.qty), outlayDone = sum(r => r.it.cost * r.it.qty), back = sum(r => (r.it.cost + r.ev.c.expected) * r.it.qty);
+    const payback = back > 0 ? outlayDone / back : null; // fraction of the (evaluated) shipment that must sell to get the outlay back
+    const chip = id => { rgId = id; syncRg(); rgHost.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => rgW.focus(), 500); };
+    const tr = rows.map(({ it, ev }) => `<tr${ev.ok ? '' : ' class="todo"'}><th><span class="ln">${esc(it.name)}</span><small>${it.qty.toLocaleString('ko-KR')}개 · 개당 원가 ${won(it.cost)}</small></th>
+      ${ev.ok ? `<td data-l="판매가">${won(ev.I.price)}</td><td data-l="개당 순이익" class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected)}<small>${(Math.round(ev.c.margin * 1000) / 10).toLocaleString('ko-KR')}%</small></td><td data-l="전부 팔면" class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected * it.qty)}<small>${ev.I.monthly ? `월 ${ev.I.monthly.toLocaleString('ko-KR')}개 팔면 ${it.qty <= ev.I.monthly ? '1개월 안에 소진' : (Math.ceil(it.qty / ev.I.monthly * 10) / 10).toLocaleString('ko-KR') + '개월'}` : ''}</small></td>`
+        : `<td colspan="3" data-l="상태"><button type="button" class="link-btn tot-link" data-id="${esc(it.id)}">카테고리·판매가·사이즈 입력하기 →</button></td>`}</tr>`).join('');
+    const tone = !done.length ? 'quiet' : profit <= 0 ? 'severe' : profit / Math.max(1, outlayDone) < 0.1 ? 'moderate' : 'balanced';
+    const head = !done.length ? `<p class="sheet-title">품목별 로켓그로스 입력을 채우면 이번 수입 전체 순이익이 여기 합산됩니다</p>`
+      : `<div class="sheet-num"><span class="num">${Math.round(profit).toLocaleString('ko-KR')}</span><span class="pct">원</span></div>
+      <p class="sheet-title">${done.length}개 품목 ${done.reduce((s, r) => s + r.it.qty, 0).toLocaleString('ko-KR')}개를 다 팔면 · 매출 ${won(revenue)} · 매입 ${won(outlayDone)} 대비 ROI ${(Math.round(profit / Math.max(1, outlayDone) * 1000) / 10).toLocaleString('ko-KR')}%${todo ? ` · 입력 전 ${todo}개 품목은 빠져 있음` : ''}</p>
+      <p class="sheet-text"><strong>${payback == null ? '본전 불가 — 팔수록 현금이 줄어듭니다' : payback > 1 ? `다 팔아도 본전이 안 됩니다 (회수 ${Math.round(payback * 100)}% 필요)` : `전체의 ${Math.round(payback * 100)}%가 팔리면 본전`}</strong>${payback != null && payback <= 1 ? ' — 그 뒤 판매분은 전부 이익입니다 (품목이 비율대로 팔린다고 가정, 반품 기대값 반영, 부가세 별도).' : ''}</p>`;
+    rgTotal.innerHTML = `<section class="sheet ${tone}"><p class="sheet-label">이번 수입 전체로 보면 (${rows.length}개 품목, 실부담 ${won(rgOutlay)})</p>${head}
+      <div class="tbl-wrap"><table class="tbl spec biz total"><thead><tr><th>품목</th><th>판매가</th><th>개당 순이익</th><th>전부 팔면</th></tr></thead><tbody>${tr}</tbody></table></div></section>`;
+    rgTotal.hidden = false;
+    rgTotal.querySelectorAll('.tot-link').forEach(b => b.addEventListener('click', () => chip(b.dataset.id)));
   }
   function openRg(id) {
     if (id) rgId = id;

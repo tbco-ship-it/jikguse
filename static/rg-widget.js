@@ -2,7 +2,9 @@
 // container. Used standalone on /rocket/ (rg.js) and embedded under the 사업자 수입 계산기 result (biz.js), so one code path
 // serves both — a fee-table or model change cannot drift between the two pages. Model in rg-calc.js.
 //
-//   RgWidget.mount(root, { fees, catsUrl, base, key, embedded })  → { load(key, ctx), reset(), render }
+//   RgWidget.mount(root, { fees, catsUrl, base, key, embedded, onChange })  → { load(key, ctx), reset(), render }
+//   RgWidget.evaluate(fees, savedState, ctx) → { ok, needs, I, c } — runs the model on a saved slot without mounting (the 사업자
+//   page sums every item's slot into a whole-shipment total).
 //   load(key, { cost, name, note, query, hs }) switches the saved-state slot (localStorage key) and, when given, sets the unit cost;
 //   query (the 품명 typed on the forwarder sheet) + hs (its HS code, chapter → likely 1차 카테고리) pick a Coupang category
 //   automatically when the slot has none saved.
@@ -35,8 +37,8 @@
   </div>
   <p class="muted small rg-cost-note">${o.embedded ? '' : `수입품이면 <a href="${o.base}business/">사업자 수입 계산기</a>에서 배대지 신청서를 붙여 넣고 [로켓그로스 수익도 같이 보기]를 누르면 관세·운임까지 포함한 개당 원가가 그대로 들어옵니다.`}</p>
   <div class="size-block">
-  <h3 class="sub-h">사이즈 유형 <small class="muted">(판매 단위 1개, 포장 포함 · 쿠팡이 배송비를 매기는 6단계)</small></h3>
-  <div class="tiers" role="radiogroup" aria-label="사이즈 유형">${root.RgCalc.SIZES.map((sz, i) => `<button type="button" class="tier" role="radio" aria-checked="false" data-i="${i}"><b>${sz.name}</b><small>${i ? '~' : ''}${sz.cm}cm · ${sz.kg}kg</small></button>`).join('')}</div>
+  <h3 class="sub-h">사이즈 유형 <small class="muted">(판매 단위 1개, 포장 포함 · 쿠팡이 입출고·배송비를 매기는 6단계)</small></h3>
+  <div class="tiers" role="radiogroup" aria-label="사이즈 유형">${root.RgCalc.SIZES.map((sz, i) => `<button type="button" class="tier" role="radio" aria-checked="false" data-i="${i}"><b>${sz.name}</b><small>${i ? '~' : ''}${sz.cm}cm · ${sz.kg}kg</small><small class="fee">물류비 —</small></button>`).join('')}</div>
   <p class="muted small rg-size-note">${SIZE_HELP}</p>
   <button type="button" class="link-btn rg-dims-toggle" aria-expanded="false">치수를 알아요 — 가로·세로·높이·무게로 정확히</button>
   <div class="row dims" hidden>
@@ -71,6 +73,29 @@
 </div>
 <div class="result rg-result" aria-live="polite"></div>`;
 
+  const numv = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
+  const modelArgs = (I, cat, table, dims, wt, price, cost, n) => {
+    const RgCalc = root.RgCalc, tier = RgCalc.sizeTier(dims, wt), cbm = dims[0] * dims[1] * dims[2] / 1e9;
+    return { ...I, table, rate: cat.r, sizeIdx: tier.i, extra: tier.extra, cbm, apparel: RgCalc.isApparel(cat.p), price, cost, tier, n };
+  };
+  // State = what save() writes (form field strings + cat/sizeMode/tierIdx/saver/simp). ctx.cost overrides the saved cost (imported 원가).
+  function evaluate(FEES, s, ctx) {
+    const RgCalc = root.RgCalc; s = s || {}; ctx = ctx || {};
+    const cat = s.cat && FEES.units[s.cat.u] && typeof s.cat.r === 'number' ? s.cat : null;
+    const sizeMode = s.sizeMode === 'dims' || (!s.sizeMode && ['d1', 'd2', 'd3', 'wt'].some(f => s[f])) ? 'dims' : 'tier';
+    const tierIdx = Number.isInteger(s.tierIdx) && RgCalc.SIZES[s.tierIdx] ? s.tierIdx : null;
+    let dims, wt, tier = null;
+    if (sizeMode === 'dims') { dims = [numv(s.d1), numv(s.d2), numv(s.d3)]; wt = numv(s.wt); if (dims.some(Boolean) || wt) tier = RgCalc.sizeTier(dims, wt); }
+    else { const r = tierIdx != null ? RgCalc.tierDims(tierIdx) : { dims: [0, 0, 0], wt: 0 }; dims = r.dims; wt = r.wt; if (tierIdx != null) tier = RgCalc.sizeTier(dims, wt); }
+    const I = { dims, wt, tier, cbm: dims[0] * dims[1] * dims[2] / 1e9, price: numv(s.price), cost: ctx.cost != null ? Math.round(ctx.cost) : numv(s.cost),
+      turnover: numv(s.turn) || 60, monthly: numv(s.monthly), retRate: numv(s.ret) / 100, unsellable: numv(s.unsell) / 100, adPct: numv(s.ad), sellerDisc: numv(s.disc),
+      inbound: numv(s.inbound), saver: !!s.saver, simplified: !!s.simp, cat, sizeMode, tierIdx };
+    const needs = { cat: !cat, price: !I.price, size: !tier };
+    if (needs.cat || needs.price || needs.size) return { ok: false, needs, I };
+    const A = modelArgs(I, cat, FEES.units[cat.u], dims, wt, I.price, I.cost, 1);
+    return { ok: true, needs, I, A, c: RgCalc.compute(A) };
+  }
+
   let seq = 0;
   function mount(host, o) {
     const { RgCalc } = root;
@@ -79,7 +104,6 @@
     host.innerHTML = formHtml(o, id);
     const q = s => host.querySelector(s);
     const F = {}; FIELDS.forEach(f => { F[f] = q(`[data-f="${f}"]`); });
-    const num = el => { const n = parseFloat((el.value || '').replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
     const out = q('.rg-result'), catInput = q('.rg-cat'), menu = q(`#${id}-menu`), saver = q('.rg-saver'), simp = q('.rg-simp');
     const catNote = q('.rg-cat-note'), sizeNote = q('.rg-size-note'), costNote = q('.rg-cost-note');
     const catField = q('.cat-field'), priceField = q('.price-field'), sizeBlock = q('.size-block'), tiers = q('.tiers'), dimsRow = q('.row.dims'), dimsToggle = q('.rg-dims-toggle');
@@ -164,12 +188,7 @@
     saver.addEventListener('change', render); simp.addEventListener('change', render);
     q('.rg-reset').addEventListener('click', () => { reset(); catInput.focus(); });
 
-    function save() {
-      if (!KEY) return;
-      const s = { cat, catAuto, bp: BP, saver: saver.checked, simp: simp.checked, retTouched, sizeMode, tierIdx };
-      for (const f of FIELDS) s[f] = F[f].value;
-      localStorage.setItem(KEY, JSON.stringify(s));
-    }
+    function save() { if (KEY) localStorage.setItem(KEY, JSON.stringify(state())); }
     function applyState(s) {
       cat = s.cat && FEES.units[s.cat.u] && typeof s.cat.r === 'number' ? s.cat : null; // 저장된 선택이 새 요금표와 안 맞으면 버린다
       catInput.value = cat ? cat.leaf : ''; catInput.title = cat ? cat.p : ''; catAuto = !!(cat && s.catAuto);
@@ -208,35 +227,41 @@
       matchFromQuery();
     }
 
-    function inputs() {
-      let dims, wt, tier = null;
-      if (sizeMode === 'dims') { dims = [num(F.d1), num(F.d2), num(F.d3)]; wt = num(F.wt); if (dims.some(Boolean) || wt) tier = RgCalc.sizeTier(dims, wt); }
-      else { const r = tierIdx != null ? RgCalc.tierDims(tierIdx) : { dims: [0, 0, 0], wt: 0 }; dims = r.dims; wt = r.wt; if (tierIdx != null) tier = RgCalc.sizeTier(dims, wt); }
-      const cbm = dims[0] * dims[1] * dims[2] / 1e9;
-      return { dims, wt, tier, cbm, price: num(F.price), cost: num(F.cost), turnover: num(F.turn) || 60, monthly: num(F.monthly),
-        retRate: num(F.ret) / 100, unsellable: num(F.unsell) / 100, adPct: num(F.ad), sellerDisc: num(F.disc), inbound: num(F.inbound), saver: saver.checked, simplified: simp.checked };
+    function state() {
+      const s = { cat, catAuto, bp: BP, saver: saver.checked, simp: simp.checked, retTouched, sizeMode, tierIdx };
+      for (const f of FIELDS) s[f] = F[f].value;
+      return s;
     }
-    const modelArgs = (I, dims, wt, price, cost, n) => {
-      const tier = RgCalc.sizeTier(dims, wt), cbm = dims[0] * dims[1] * dims[2] / 1e9;
-      return { ...I, table: unitOf(cat), rate: cat.r, sizeIdx: tier.i, extra: tier.extra, cbm, apparel: RgCalc.isApparel(cat.p), price, cost, tier, n };
-    };
+    const args = (I, dims, wt, price, cost, n) => modelArgs(I, cat, unitOf(cat), dims, wt, price, cost, n);
     function bandLabel(bands, price) {
       const i = RgCalc.band(bands, price);
       const lo = bands[i], hi = bands[i + 1];
       return hi ? `${lo.toLocaleString('ko-KR')}~${hi.toLocaleString('ko-KR')}원 구간` : `${lo.toLocaleString('ko-KR')}원 이상 구간`;
     }
 
-    function render() {
+    function render() { draw(); if (o.onChange) o.onChange(); }
+    // 유형별 입출고+배송비: 카테고리(요금 그룹)와 판매가(구간)가 정해지면 6개 버튼에 다 적어 비교하게 한다
+    function paintFees(I) {
+      const t = cat && I.price ? unitOf(cat) : null, sold = I.price * (1 - I.sellerDisc / 100);
+      tiers.querySelectorAll('.tier').forEach(b => {
+        const i = +b.dataset.i, el = b.querySelector('.fee');
+        if (!t) { el.textContent = '물류비 —'; b.title = '카테고리·판매가를 넣으면 유형별 입출고+배송비가 표시됩니다'; return; }
+        const wh = RgCalc.lookup(t, 'wh', i, sold), sh = RgCalc.lookup(t, 'sh', i, sold);
+        el.textContent = `물류비 ${(wh + sh).toLocaleString('ko-KR')}`; b.title = `입출고 ${won(wh)} + 배송 ${won(sh)} (판매가 ${won(sold)} 구간)`;
+      });
+    }
+    function draw() {
       save();
-      const I = inputs();
+      const ev = evaluate(FEES, state()), I = ev.I;
       paintTiers(I.tier ? I.tier.i : -1);
+      paintFees(I);
       sizeNote.textContent = !I.tier ? SIZE_HELP
         : sizeMode === 'dims' ? `사이즈 유형: ${I.tier.name} — 세변 합 ${I.tier.cm}cm · ${I.wt.toLocaleString('ko-KR')}g · 부피 ${(I.cbm * 1000).toFixed(2)}ℓ(${I.cbm.toFixed(4)}㎥)${I.tier.extra ? ` · 특대형 초과 추가비용 ${won(I.tier.extra)}` : ''}`
-        : `${I.tier.name}: 세변 합 ${RgCalc.SIZES[I.tier.i].cm}cm · ${RgCalc.SIZES[I.tier.i].kg}kg까지. 입출고·배송비는 유형으로 정해지고, 보관비와 묶음 유형은 이 유형의 대표 크기(${I.dims.join('×')}mm · ${(I.wt / 1000).toLocaleString('ko-KR')}kg)로 어림합니다.`;
+        : `${I.tier.name}: 세변 합 ${RgCalc.SIZES[I.tier.i].cm}cm · ${RgCalc.SIZES[I.tier.i].kg}kg까지.${ev.ok ? ` 이 유형·판매가 구간의 물류비 = 입출고 ${won(ev.c.wh)} + 배송 ${won(ev.c.sh)}.` : ' 입출고·배송비는 유형으로 정해지고,'} 보관비와 묶음 유형은 이 유형의 대표 크기(${I.dims.join('×')}mm · ${(I.wt / 1000).toLocaleString('ko-KR')}kg)로 어림합니다.`;
       catNote.textContent = cat ? `${catAuto && ctx.query ? `신청서 품명 '${ctx.query}' → 자동 매칭 · 다르면 위 칸에서 바꾸세요 · ` : ''}${cat.p.replace(/>/g, ' › ')} · 판매수수료 ${cat.r}% (VAT 별도)${unitOf(cat).lowasp ? ' · 14,000원 미만 저가 상품 전용 할인 대상' : ''}${RgCalc.isApparel(cat.p) ? ' · 45일 무료 보관·의류 회수비 단가' : ''}`
         : ctx.query && catInput.value === ctx.query ? `신청서 품명 '${ctx.query}'에 딱 맞는 쿠팡 카테고리가 없어요 — 상품 종류를 다른 말로 적어 골라 주세요(예: 청소포, 안경 액세서리).` : CAT_HELP;
       // what the seller still has to type is marked; placeholders talk until then
-      const needs = { cat: !cat, price: !I.price, size: !I.tier };
+      const needs = ev.needs;
       catField.classList.toggle('need', needs.cat); priceField.classList.toggle('need', needs.price); sizeBlock.classList.toggle('need', needs.size);
       catInput.placeholder = PH.cat[needs.cat ? 0 : 1]; F.price.placeholder = PH.price[needs.price ? 0 : 1];
       if (needs.cat || needs.price || needs.size) {
@@ -245,8 +270,7 @@
         lastNum = null;
         return;
       }
-      const A = modelArgs(I, I.dims, I.wt, I.price, I.cost, 1);
-      const c = RgCalc.compute(A);
+      const A = ev.A, c = ev.c;
       const be = RgCalc.breakEven(A), m20 = RgCalc.breakEven(A, 0.2), m30 = RgCalc.breakEven(A, 0.3);
       const tone = c.expected <= 0 ? 'severe' : c.margin < 0.1 ? 'moderate' : 'balanced';
       const retLine = c.returns.r > 0 ? `반품 ${pct1(c.returns.r)} 반영: 반품 1건당 ${won(c.returns.perReturn)}(회수 ${won(c.returns.pickup)} + 재입고 ${won((1 - c.returns.q) * c.returns.restock)} + 재판매 불가 ${pct1(c.returns.q)}분 원가·반출비 ${won(c.returns.cogsLoss + c.returns.removal)})${c.billable < 1 && !I.saver ? ` · 월 20건 무료라 ${pct1(1 - c.billable)}는 무료` : ''}${I.saver ? ' · 세이버로 회수·재입고비 0' : ''}` : '반품률 0% — 반품 비용 없음';
@@ -266,7 +290,7 @@
       const bundle = [1, 2, 3, 4].map(n => {
         const dims = n === 1 ? I.dims : RgCalc.bundleDims(I.dims, n);
         const priceN = n === 1 ? I.price : (BP[n] || I.price * n);
-        const B = { ...modelArgs(I, dims, I.wt * n, priceN, I.cost * n, n), inbound: I.inbound * n };
+        const B = { ...args(I, dims, I.wt * n, priceN, I.cost * n, n), inbound: I.inbound * n };
         const r = RgCalc.compute(B);
         return { n, dims, priceN, r, tier: B.tier, be: RgCalc.breakEven(B), logistics: r.wh + r.sh };
       });
@@ -302,5 +326,5 @@
     return { load, reset, render, focus: () => catInput.focus() };
   }
 
-  root.RgWidget = { mount };
+  root.RgWidget = { mount, evaluate };
 })(typeof window !== 'undefined' ? window : globalThis);

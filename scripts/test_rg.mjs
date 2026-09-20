@@ -101,4 +101,29 @@ try {
   });
 } catch (e) { console.log('skip real-table tests:', e.message); }
 
+// RgWidget.evaluate: a saved slot (what the widget's save() writes) → same numbers as the in-form path, without a DOM.
+new Function(readFileSync(join(ROOT, 'static/rg-widget.js'), 'utf8'))();
+{
+  const FEES = { units: [T], asof: 'test' };
+  const cat = { p: '생활용품>테스트', r: 10.5, u: 0 };
+  const slot = { cat, price: '19900', cost: '6000', sizeMode: 'tier', tierIdx: 0, turn: '60', monthly: '100', ret: '20', unsell: '20', ad: '0', disc: '0', inbound: '0' };
+  t('evaluate: complete slot → ok, equals RgCalc.compute with the tier\'s representative dims', () => {
+    const ev = globalThis.RgWidget.evaluate(FEES, slot);
+    assert.ok(ev.ok); assert.equal(ev.I.tier.name, '극소형');
+    const d = RgCalc.tierDims(0);
+    near(ev.c.expected, RgCalc.compute({ ...base, price: 19900, cost: 6000, cbm: d.dims[0] ** 3 / 1e9, monthly: 100 }).expected);
+  });
+  t('evaluate: missing 판매가/카테고리/사이즈 → ok:false with needs; ctx.cost overrides the saved cost; empty slot is not ok', () => {
+    assert.deepEqual(globalThis.RgWidget.evaluate(FEES, { ...slot, price: '' }).needs, { cat: false, price: true, size: false });
+    assert.equal(globalThis.RgWidget.evaluate(FEES, { ...slot, cat: null }).ok, false);
+    assert.equal(globalThis.RgWidget.evaluate(FEES, { ...slot, tierIdx: null }).ok, false);
+    assert.equal(globalThis.RgWidget.evaluate(FEES, slot, { cost: 835.4 }).c.cost, 835);
+    assert.equal(globalThis.RgWidget.evaluate(FEES, null).ok, false);
+  });
+  t('evaluate: pre-toggle save (dims only, no sizeMode) is read as dims mode', () => {
+    const ev = globalThis.RgWidget.evaluate(FEES, { ...slot, sizeMode: undefined, tierIdx: undefined, d1: '400', d2: '300', d3: '150', wt: '3000' });
+    assert.ok(ev.ok); assert.equal(ev.I.tier.name, '소형');
+  });
+}
+
 console.log(`${n} tests passed`);

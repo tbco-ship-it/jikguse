@@ -60,6 +60,7 @@
   <p class="muted small">품목을 고르면 위 계산의 개당 원가(물품가 + 관세 + 운임·부가서비스 안분, 부가세 제외)가 매입원가로 들어갑니다. 카테고리·판매가·포장 크기만 넣으세요. 품목별 입력은 각각 기억합니다.</p>
   <div class="chips" id="rg-chips" role="tablist" aria-label="품목 선택"></div>
   <div class="calc-grid biz-grid rg-embed" id="rg-host" data-fees="{{ base }}static/rg_fees.json?v={{ rv }}" data-cats="{{ base }}static/rg_cats.json?v={{ rv }}"></div>
+  <div id="rg-total" class="result rg-total" hidden></div>
 </div>
 </section>
 
