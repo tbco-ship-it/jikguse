@@ -284,7 +284,7 @@
   const rgReady = () => rgW ? Promise.resolve(rgW) : fetch(rgHost.dataset.fees).then(r => r.json()).then(fees => (rgW = window.RgWidget.mount(rgHost, { fees, catsUrl: rgHost.dataset.cats, base, key: null, embedded: true })));
   function syncRg() {
     if (!rgItems.some(i => i.hs === rgHs)) rgHs = rgItems.length ? rgItems[0].hs : null;
-    rgChips.innerHTML = rgItems.map(i => `<button type="button" class="chip${i.hs === rgHs ? ' on' : ''}" role="tab" aria-selected="${i.hs === rgHs}" data-hs="${i.hs}">${esc(i.name)}<small>개당 ${won(i.cost)}</small></button>`).join('');
+    rgChips.innerHTML = rgItems.map(i => `<button type="button" class="chip${i.hs === rgHs ? ' on' : ''}" role="tab" aria-selected="${i.hs === rgHs}" data-hs="${i.hs}" title="${esc(i.name)}"><span>${esc(i.name)}</span><small>개당 ${won(i.cost)}</small></button>`).join('');
     rgChips.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => { rgHs = b.dataset.hs; syncRg(); }));
     const it = rgItems.find(i => i.hs === rgHs);
     if (it && rgW) rgW.load(KEY + '.rg.' + it.hs, { cost: it.cost, name: it.name, note: `${it.name} 개당 원가 ${won(it.cost)} — 위 수입 계산에서 가져옴 (물품가 + 관세 + 운임·부가서비스 안분, 부가세 제외). 위 수입 계산이 바뀌면 같이 바뀝니다.` });
