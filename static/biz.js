@@ -234,7 +234,9 @@
       return;
     }
     const orig = BizCalc.ORIGINS.find(o => o.k === origin.value);
-    const rows = r.lines.map(l => `<tr><th><span class="ln">${esc(nameOf(l.entry))}</span><small>${fmtHs(l.entry.c)} · ${l.qty.toLocaleString('ko-KR')} × ${l.price.toLocaleString('ko-KR')} ${cur}</small></th><td data-l="과세가격">${won(l.cif)}</td><td data-l="세율">${pct(l.rate.applied.rate)}<small>${esc(l.rate.applied.label)}</small></td><td data-l="관세">${won(l.duty)}</td><td data-l="부가세">${won(l.vat)}</td></tr>`).join('');
+    // 개당 원가(VAT 제외) = (과세가격 + 관세 + 과세 제외 부가서비스 안분) ÷ 수량 → 로켓그로스 계산기로 넘긴다
+    const unitCost = l => (l.cif + l.duty + (r.cif ? r.brokerage * l.cif / r.cif : 0)) / (l.qty || 1);
+    const rows = r.lines.map(l => `<tr><th><span class="ln">${esc(nameOf(l.entry))}</span><small>${fmtHs(l.entry.c)} · ${l.qty.toLocaleString('ko-KR')} × ${l.price.toLocaleString('ko-KR')} ${cur}</small><small><a class="rg-link" href="${base}rocket/#cost=${Math.round(unitCost(l))}&name=${encodeURIComponent(nameOf(l.entry))}">개당 ${won(unitCost(l))} → 로켓그로스 수익 보기</a></small></th><td data-l="과세가격">${won(l.cif)}</td><td data-l="세율">${pct(l.rate.applied.rate)}<small>${esc(l.rate.applied.label)}</small></td><td data-l="관세">${won(l.duty)}</td><td data-l="부가세">${won(l.vat)}</td></tr>`).join('');
     const notes = [];
     if (input.co && r.ftaLines) notes.push(`협정세율 ${r.ftaLines}개 품목 — 수입신고 때 ${esc(orig.name)} 원산지증명서(C/O)를 제출해야 합니다. 원산지 기준(역내 부가가치·세번 변경)을 못 채우면 기본세율로 돌아갑니다.`);
     if (input.co && !r.ftaLines) notes.push(`${esc(orig.name)} 원산지 협정세율이 기본세율보다 낮은 품목이 없어 C/O 없이도 같은 세액입니다.`);

@@ -50,20 +50,23 @@ def main():
         h.update(f.read_bytes())
     v = h.hexdigest()[:8]
     hv = hashlib.md5((ROOT / "data/hs.json").read_bytes() + (ROOT / "data/hs_req.json").read_bytes()).hexdigest()[:8]
+    rg = json.loads((ROOT / "data/rg_fees.json").read_text())  # 로켓그로스 요금표 (scripts/build_rg.py)
+    rv = hashlib.md5((ROOT / "data/rg_fees.json").read_bytes() + (ROOT / "data/rg_cats.json").read_bytes()).hexdigest()[:8]
 
     env = Environment(loader=FileSystemLoader(ROOT / "templates"), autoescape=select_autoescape(["html"]))
     env.filters["won"] = won
     env.filters["won_k"] = lambda n: won(round(n, -3))  # '약 155,000원' in titles — an exact-looking 155,016 next to '약' reads wrong
     env.filters["pct"] = lambda r: f"{r * 100:g}%"
-    env.globals.update(site=SITE, base=base, origin=origin, today=date.today().isoformat(), v=v, hv=hv,
-                       adsense_pub=args.adsense_pub, items=items, countries=countries, fx=fx, rules=RULES)
+    env.globals.update(site=SITE, base=base, origin=origin, today=date.today().isoformat(), v=v, hv=hv, rv=rv,
+                       adsense_pub=args.adsense_pub, items=items, countries=countries, fx=fx, rules=RULES,
+                       rg={"asof": rg["asof"], "promo_until": rg["promo_until"]})
 
     if DIST.exists():
         shutil.rmtree(DIST)
     DIST.mkdir()
     shutil.copytree(ROOT / "static", DIST / "static")
     (DIST / "static/data.json").write_text(json.dumps({"items": items, "countries": countries, "fx": fx, "rules": RULES}, ensure_ascii=False, separators=(",", ":")))
-    for f in ("hs.json", "hs_req.json"):  # business calculator tables (scripts/build_hs.py), fetched lazily
+    for f in ("hs.json", "hs_req.json", "rg_fees.json", "rg_cats.json"):  # business / rocket calculator tables, fetched lazily
         shutil.copy(ROOT / "data" / f, DIST / "static" / f)
 
     urls = []
@@ -76,6 +79,7 @@ def main():
 
     write("", "index.html")
     write("business/", "business.html")
+    write("rocket/", "rocket.html")
     for page in ("about", "methodology", "privacy", "contact"):
         write(f"{page}/", f"{page}.html")
     for g in ("list-clearance", "combined-tax", "fx", "fta"):
