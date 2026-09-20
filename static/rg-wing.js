@@ -4,26 +4,47 @@
 //                                              판매가(표시가·최종구매가) · 쿠팡 예상 비용(개당)·누적보관비 · 반품률(월)
 //   diagnose(w, opts)  → 실판매가, 판매 속도·추세, 전환율, 재고 소진일, 리드타임 대비 부족분·놓치는 순이익, 추천 발주 수량
 // Labels are matched loosely (whitespace, ⓘ badges, '자동조정'·'할인' tags in between) because the copied text keeps the layout
-// only roughly; the layout verified so far is the 2026-09 상품 관리 list (scripts/fixtures/wing_*.txt).
+// only roughly; verified against the 2026-09-21 재고현황 list — innerText, a one-line tab copy, and a real drag-copy with the
+// 판매 상세 panel open (scripts/fixtures/wing_row_*.txt).
 (function (root) {
   const num = s => { const n = parseFloat(String(s).replace(/,/g, '')); return isNaN(n) ? null : n; };
   const one = (t, re) => { const m = t.match(re); return m ? num(m[m.length - 1]) : null; };
-  const all = (t, re) => { const out = []; for (const m of t.matchAll(re)) out.push(num(m[1])); return out; };
-  // 3 hits = 어제·7일·30일, 2 = 7일·30일, 1 = 30일 (the summary boxes run yesterday → 7d → 30d)
-  const byPeriod = a => a.length >= 3 ? { y: a[0], d7: a[1], d30: a[2] } : a.length === 2 ? { y: null, d7: a[0], d30: a[1] } : { y: null, d7: null, d30: a[0] == null ? null : a[0] };
   const HEADER = /상품\s*정보|최근\s*판매량|재고\s*상태|판매가\s*\(|비용\s*\(|상품\s*상태|아이템위너|배지/;
 
+  // One period box (어제 / 지난 7일 / 지난 30일): the label, its count right after, then 단품기준·번들기준·매출 (원)·조회 수 until the
+  // next period label or the 재고 column. The same label can appear twice (a compact row + a detailed box) — first non-null wins.
+  const PERIODS = [['y', /어제/g], ['d7', /지난\s*7\s*일/g], ['d30', /지난\s*30\s*일/g]];
+  const CUT = /어제|지난\s*7\s*일|지난\s*30\s*일|판매\s*가능|입고\s*중|판매가|반품률/;
+  function periodBox(t, re) {
+    const box = { sold: null, rev: null, views: null, single: null, bundle: null };
+    for (const m of t.matchAll(re)) {
+      const rest = t.slice(m.index + m[0].length), cut = rest.slice(1).search(CUT), seg = cut < 0 ? rest : rest.slice(0, cut + 1);
+      const pick = (re2, k) => { if (box[k] == null) box[k] = one(seg, re2); };
+      pick(/^\s*[:：]?\s*([\d,]+)/, 'sold');
+      pick(/매출\s*(?:\(\s*원\s*\))?\s*[:：]?\s*([\d,]+)/, 'rev');
+      pick(/조회\s*수\s*[:：]?\s*([\d,]+)/, 'views');
+      pick(/단품\s*기준\s*[:：]?\s*([\d,]+)/, 'single');
+      pick(/번들\s*기준\s*[:：]?\s*([\d,]+)/, 'bundle');
+    }
+    return box;
+  }
+
   function parse(text) {
-    const t = String(text || '').replace(/\u00a0/g, ' ').replace(/\r/g, '');
+    // a whole list pasted → the first product only: a row ends with its 비용 column, so an 어제 after 예상(개당)/누적보관비 starts the next row
+    let t = String(text || '').replace(/\u00a0/g, ' ').replace(/\r/g, '');
+    const costAt = t.search(/예상\s*\(?\s*개당|누적\s*보관비/);
+    if (costAt >= 0) { const nxt = t.indexOf('어제', costAt); if (nxt > 0) t = t.slice(0, nxt); }
     const w = {};
-    w.y = { sold: one(t, /어제\s*[:：]?\s*([\d,]+)/) };
-    w.d7 = { sold: one(t, /지난\s*7\s*일\s*[:：]?\s*([\d,]+)/) };
-    w.d30 = { sold: one(t, /지난\s*30\s*일\s*[:：]?\s*([\d,]+)/) };
-    const single = all(t, /단품\s*기준\s*[:：]?\s*([\d,]+)/g), bundle = all(t, /번들\s*기준\s*[:：]?\s*([\d,]+)/g);
-    const rev = byPeriod(all(t, /매출\s*[:：]?\s*([\d,]+)\s*원/g)), views = byPeriod(all(t, /조회\s*수\s*[:：]?\s*([\d,]+)/g));
-    w.y.rev = rev.y; w.y.views = views.y;
-    w.d7.rev = rev.d7; w.d7.views = views.d7; w.d7.single = single.length >= 2 ? single[0] : null; w.d7.bundle = bundle.length >= 2 ? bundle[0] : null;
-    w.d30.rev = rev.d30; w.d30.views = views.d30; w.d30.single = single.length ? single[single.length - 1] : null; w.d30.bundle = bundle.length ? bundle[bundle.length - 1] : null;
+    for (const [k, re] of PERIODS) w[k] = periodBox(t, re);
+    // A drag-copy of the expanded 판매 상세 panel keeps only the values, not their labels (2026-09-21 measured: '49,000원 / 0 /
+    // 판매 추이 보기 / 313,600원 / 366 / 1,617,000원 / 2,419 / 9.81%'): after the 비용 column, 'N원' + a bare number = 매출·조회수 of
+    // 어제 → 7일 → 30일, and the lone percentage is the 반품률.
+    if (costAt >= 0 && w.d30.rev == null) {
+      const tail = t.slice(costAt);
+      const pairs = [...tail.matchAll(/([\d,]+)\s*원(?!\s*\))\s*\n\s*(?:([\d,]+)(?![\d,]*\s*[원%]))?/g)].map(m => [num(m[1]), m[2] != null ? num(m[2]) : null]);
+      const keys = pairs.length >= 3 ? ['y', 'd7', 'd30'] : pairs.length === 2 ? ['d7', 'd30'] : pairs.length === 1 ? ['d30'] : [];
+      keys.forEach((k, i) => { if (w[k].rev == null) w[k].rev = pairs[i][0]; if (w[k].views == null) w[k].views = pairs[i][1]; });
+    }
     // 판매가능 carries a '9일' days-left badge before the count
     const av = t.match(/판매\s*가능\s*(?:\D{0,12}?(\d+)\s*일)?\D{0,12}?([\d,]+)/);
     w.stock = { avail: av ? num(av[2]) : null, availDays: av && av[1] ? num(av[1]) : null,
@@ -33,6 +54,7 @@
     w.cost = { unit: one(t, /예상\s*\(?\s*개당\s*\)?\s*[:：]?\D{0,8}?([\d,]+)/), storageMonth: one(t, /누적\s*보관비\s*[:：]?\s*([\d,]+)/) };
     const rm = t.match(/반품률\s*(?:\(\s*(\d+)\s*월\s*\))?[^\d%]{0,12}?([\d.]+)\s*%/);
     w.ret = { rate: rm ? num(rm[2]) : null, month: rm && rm[1] ? num(rm[1]) : null };
+    if (w.ret.rate == null && costAt >= 0) { const pm = t.slice(costAt).match(/([\d.]+)\s*%/); if (pm) w.ret.rate = num(pm[1]); } // label lost in a drag-copy
     // product name: the longest non-header, non-numeric line before the first 어제
     const head = t.split(/어제/)[0].split(/[\n\t]/).map(s => s.replace(/\d{7,}(\s*[·•]\s*\d{7,})*|아이템위너|배지/g, ' ').replace(/\s+/g, ' ').trim())
       .filter(s => s && /[가-힣A-Za-z]/.test(s) && !HEADER.test(s));
@@ -43,6 +65,7 @@
     if (w.d30.sold == null && w.d7.sold == null) missing.push('판매량(지난 7일·30일)');
     if (w.stock.avail == null) missing.push('판매가능 재고');
     if (w.price.list == null) missing.push('판매가');
+    if (w.d30.rev == null || w.ret.rate == null) missing.push(`${w.d30.rev == null ? '매출·조회수' : ''}${w.d30.rev == null && w.ret.rate == null ? '·' : ''}${w.ret.rate == null ? '반품률' : ''} — 재고현황에서 판매량 숫자(지난 30일)를 눌러 판매 상세를 펼친 뒤 상품 줄부터 상세 끝까지 복사하면 읽힙니다`);
     const ok = w.d30.sold != null || w.d7.sold != null;
     return { ok, w, missing };
   }

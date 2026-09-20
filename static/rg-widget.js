@@ -76,7 +76,7 @@
 <div class="result rg-result" aria-live="polite"></div>
 <div class="calc card rg-wing">
   <div class="sub-row"><h2 class="card-title">윙 실적으로 진단 <small class="muted">(선택)</small></h2><button type="button" class="link-btn rg-wing-clear" hidden>지우기</button></div>
-  <p class="muted small">이미 파는 상품이면 윙 › 로켓그로스 › 상품 관리에서 그 상품 줄을 <b>상품정보부터 반품률 박스까지</b> 드래그해 복사한 뒤 붙여 넣으세요. 실제 판매가·판매 속도·재고·반품률로 위 계산을 실적 기준으로 바꾸고, 다음 수입 발주 수량까지 계산합니다. 붙여 넣은 내용은 이 기기에만 저장됩니다.</p>
+  <p class="muted small">이미 파는 상품이면 윙 › 로켓그로스 › <b>재고현황</b>에서 그 상품의 판매량 숫자(지난 30일)를 눌러 판매 상세를 펼치고, <b>상품 줄부터 펼쳐진 상세 끝(반품률)까지</b> 드래그해 복사한 뒤 붙여 넣으세요. 실제 판매가·판매 속도·재고·반품률로 위 계산을 실적 기준으로 바꾸고, 다음 수입 발주 수량까지 계산합니다. 붙여 넣은 내용은 이 기기에만 저장됩니다.</p>
   <div class="paste"><textarea class="rg-wing-in" rows="4" spellcheck="false" placeholder="어제 2 · 지난 7일 49 · 지난 30일 294 · 판매가능 106 · 입고중 100 · 판매가 9,800 · 매출 1,666,000원 · 조회 수 2,509 · 반품률 9.8% …"></textarea>
   <div class="paste-actions"><button type="button" class="next rg-wing-go">진단하기</button><span class="muted small rg-wing-note"></span></div></div>
   <div class="row rg-wing-opts" hidden>
@@ -204,7 +204,7 @@
     saver.addEventListener('change', render); simp.addEventListener('change', render);
     q('.rg-reset').addEventListener('click', () => { reset(); catInput.focus(); });
     WF.lead.addEventListener('input', render); WF.cover.addEventListener('input', render);
-    wingGo.addEventListener('click', () => { if (!root.RgWing) return; const r = root.RgWing.parse(wingIn.value); W = r.ok ? r.w : null; wingNote.textContent = r.ok ? (r.missing.length ? `읽었어요 · 못 찾은 항목: ${r.missing.join(', ')}` : '') : (wingIn.value.trim() ? '판매량(지난 7일·30일)을 못 찾았어요 — 상품 줄과 아래 판매 요약 박스까지 같이 복사해 주세요. 계속 안 되면 hello@jikguse.com 으로 화면 텍스트를 보내 주세요.' : ''); if (W) fillFromWing(); render(); if (W) wingOut.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    wingGo.addEventListener('click', () => { if (!root.RgWing) return; const r = root.RgWing.parse(wingIn.value); W = r.ok ? r.w : null; wingNote.textContent = r.ok ? (r.missing.length ? `읽었어요 · 못 찾은 것: ${r.missing.join(' · ')}` : '') : (wingIn.value.trim() ? '판매량(어제·지난 7일·30일)을 못 찾았어요 — 재고현황의 상품 줄을 통째로 복사해 주세요. 계속 안 되면 hello@jikguse.com 으로 화면 텍스트를 보내 주세요.' : ''); if (W) fillFromWing(); render(); if (W) wingOut.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     wingIn.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) wingGo.click(); });
     wingClear.addEventListener('click', () => { wingIn.value = ''; W = null; wingNote.textContent = ''; render(); });
     // measured values replace the estimates: 월 판매량 ← 지난 30일 판매량, 반품률 ← 반품률(월)
