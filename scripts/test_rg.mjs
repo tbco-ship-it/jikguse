@@ -70,10 +70,24 @@ t('판매자 할인 10%: 수수료·구간·매출 모두 할인 후 가격 기�
   const c = RgCalc.compute({ ...base, price: 20000, sellerDisc: 10 });
   assert.equal(c.sold, 18000); assert.equal(c.commission, 1890); assert.equal(c.wh, 1100);
 });
-t('간이과세자: 매출 99%, 비용 VAT 포함', () => {
-  const a = RgCalc.compute({ ...base, price: 20000, monthly: 100 }), s = RgCalc.compute({ ...base, price: 20000, monthly: 100, simplified: true });
-  near(s.revenue, 19800); near(s.keptProfit, 19800 - (2100 + 1200 + 1700 + 14.5) * 1.1 - 6000, 0.001);
-  assert.ok(s.expected > a.expected);
+t('간이과세자: 공급대가 1.5% 납부, 비용·원가는 VAT 포함 현금에서 0.5% 공제 (GPT-6 Pro 2026-09-21)', () => {
+  const s = RgCalc.compute({ ...base, price: 20000, monthly: 100, simplified: true });
+  near(s.revenue, 20000 * 0.985); const mul = 1.1 * 0.995;
+  near(s.cost, 6000 * mul, 0.001); near(s.keptProfit, 19700 - (2100 + 1200 + 1700 + 14.5) * mul - 6000 * mul, 0.001);
+  // GPT-6 Pro 분리 시험: 판매가 20,000·원가 10,000·다른 요금 0 → 순이익 8,755 (현금 매입 11,000 − 공제 55 − 세액 300)
+  const g = RgCalc.compute({ ...base, price: 20000, cost: 10000, simplified: true, table: { bands: [0], wh: [[0], [0], [0], [0], [0], [0]], sh: [[0], [0], [0], [0], [0], [0]] }, rate: 0, cbm: 0 });
+  near(g.keptProfit, 8755, 0.001);
+});
+t('전부 팔면: 재판매되는 반품은 재고를 줄이지 않는다 — perStock = expected / (1 − r(1−q)) (GPT-6 Pro 2026-09-21)', () => {
+  const c = RgCalc.compute({ ...base, price: 220, cost: 100, retRate: 0.2, unsellable: 0, saver: true, monthly: 0, table: { bands: [0], wh: [[0], [0], [0], [0], [0], [0]], sh: [[0], [0], [0], [0], [0], [0]] }, rate: 0, cbm: 0 });
+  near(c.expected, 80, 0.001); near(c.perStock, 100, 0.001); // 10개 재고 → 1,000원, 시도당 80원이 아니라
+});
+t('프로모션 종료 후에는 기본 단가표 (GPT-6 Pro 2026-09-21)', () => {
+  assert.equal(RgCalc.promoOver({ promo_until: '2027-01-31' }, '2027-01-31'), false);
+  assert.equal(RgCalc.promoOver({ promo_until: '2027-01-31' }, '2027-02-01'), true);
+  const t = { bands: [0, 5000], wh: [[1000, 1050], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1]], sh: [[1500, 1950], [1, 1], [1, 1], [1, 1], [1, 1], [1, 1]], base_wh: [1650, 0, 0, 0, 0, 0], base_sh: [2200, 0, 0, 0, 0, 0] };
+  const a = RgCalc.compute({ ...base, price: 7350, table: t, sizeIdx: 0 }), b = RgCalc.compute({ ...base, price: 7350, table: t, sizeIdx: 0, promoOver: true });
+  assert.deepEqual([a.wh, a.sh, b.wh, b.sh], [1050, 1950, 1650, 2200]);
 });
 t('광고비 10%: 매출 대비', () => { near(RgCalc.compute({ ...base, price: 20000, adPct: 10 }).ad, 2000); });
 t('breakEven: 기대 순이익이 0을 넘는 가장 낮은 10원 단위 가격', () => {

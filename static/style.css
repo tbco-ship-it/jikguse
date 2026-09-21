@@ -131,7 +131,7 @@ ul{padding-left:1.1em}
 .unit{color:var(--muted);font-weight:500}
 .more{margin-top:12px}.more summary{cursor:pointer;color:var(--text-2);font-size:.92rem;font-weight:600;padding:6px 0;list-style:none}.more summary::-webkit-details-marker{display:none}.more summary::before{content:"+ ";color:var(--muted)}.more[open] summary::before{content:"– "}
 .more .row{margin-top:8px}
-.check{display:flex;align-items:center;gap:10px;font-size:.92rem;color:var(--text-2);font-weight:500;padding-top:26px}
+.check,.calc .check{display:flex;flex-direction:row;align-items:center;gap:10px;font-size:.92rem;color:var(--text-2);font-weight:500;padding-top:26px}
 .check input{width:20px;height:20px;accent-color:var(--blue)}
 .sheet.quiet .sheet-title{margin-top:0}
 .tbl.mini{margin-top:14px;font-size:.92rem;background:transparent}

@@ -4,10 +4,16 @@
 // Responses are cached 10 minutes per number; the number is never written anywhere but the cache key.
 // Secrets: TD_CLIENT_ID / TD_CLIENT_SECRET (tracker.delivery, Free plan credentials expire every 21 days — renew in the console),
 //          UNIPASS_KEY (optional until the UNIPASS OpenAPI application is approved; /customs answers { available: false } without it).
+// Abuse guard (GPT-6 Pro 2026-09-21: nothing stopped a script from burning the upstream quotas): GET only, browser calls must come from
+// an allowed Origin/Referer, and a Cloudflare rate-limit binding RL (30 req/min per IP, {"type":"ratelimit","namespace_id":"1001",
+// "simple":{"limit":30,"period":60}}) answers 429 when present. Upstream errors are never cached.
 const ORIGINS = new Set(["https://jikguse.com", "https://www.jikguse.com", "https://tbco-ship-it.github.io", "http://localhost:8147", "http://127.0.0.1:8147"]);
 const CARRIERS = new Set(["kr.cjlogistics", "kr.hanjin", "kr.lotte", "kr.logen", "kr.epost", "kr.kdexp"]);
 const cors = (req) => { const o = req.headers.get("Origin") || ""; return { "Access-Control-Allow-Origin": ORIGINS.has(o) ? o : "https://jikguse.com", "Vary": "Origin", "Access-Control-Allow-Methods": "GET", "Cache-Control": "public, max-age=600" }; };
 const json = (body, h, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...h, "content-type": "application/json; charset=utf-8" } });
+const NO_STORE = { "Cache-Control": "no-store" };
+// browser calls carry Origin (CORS) or at least Referer; a bare curl carries neither — this is a speed bump, the rate limit is the guard
+const fromSite = req => { const o = req.headers.get("Origin"); if (o) return ORIGINS.has(o); const r = req.headers.get("Referer") || ""; return [...ORIGINS].some(x => r.startsWith(x + "/")); };
 
 const TRACK_QUERY = `query Track($carrierId: ID!, $trackingNumber: String!) {
   track(carrierId: $carrierId, trackingNumber: $trackingNumber) {
@@ -28,6 +34,7 @@ async function track(carrier, no, env) {
   if (!tr) {
     const code = errs.length ? (errs[0].extensions && errs[0].extensions.code) || "upstream" : "upstream";
     if (code === "NOT_FOUND") return { found: false, events: [] }; // the carrier does not know this number — not a failure
+    if (code === "BAD_REQUEST") return { found: false, events: [], reason: "format" }; // not a valid number for this carrier — an answer, not an outage
     return { error: code, events: [] };
   }
   const events = (tr.events && tr.events.edges || []).map(e => e.node).map(n => ({ time: n.time, code: n.status && n.status.code, name: n.status && n.status.name, text: n.description || "" }));
@@ -40,6 +47,8 @@ const unesc = s => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;
 const blocks = (xml, tag) => [...xml.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "g"))].map(m => m[1]);
 const fields = block => { const o = {}; for (const m of block.matchAll(/<([A-Za-z]+)>([^<]*)<\/\1>/g)) o[m[1]] = unesc(m[2]).trim(); return o; };
 export function parseCustomsXml(xml) {
+  // a maintenance page or an error document is not "no record": the UNIPASS answer always carries tCnt (GPT-6 Pro 2026-09-21)
+  if (!/<tCnt>|<cargCsclPrgsInfoQryVo>/.test(xml || "")) return { error: "upstream", detail: String(xml || "").replace(/<[^>]+>/g, " ").trim().slice(0, 120) };
   const notice = (blocks(xml, "ntceInfo")[0] || "").trim();
   const tcnt = (blocks(xml, "tCnt")[0] || "").trim();
   if (tcnt === "-1") return { error: notice || "upstream" };
@@ -83,6 +92,14 @@ export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url); const h = cors(req);
     if (req.method === "OPTIONS") return new Response(null, { headers: h });
+    if (req.method !== "GET") return json({ error: "method" }, { ...h, ...NO_STORE }, 405);
+    if (url.pathname === "/health") { let rl = null; try { rl = env.RL ? (await env.RL.limit({ key: "health" })).success : "unbound"; } catch (e) { rl = "err " + String(e && e.message).slice(0, 80); } return json({ ok: true, rl }, { ...h, ...NO_STORE }); }
+    if (!fromSite(req)) return json({ error: "origin" }, { ...h, ...NO_STORE }, 403);
+    if (env.RL) {
+      const ip = req.headers.get("CF-Connecting-IP") || "0";
+      const { success } = await env.RL.limit({ key: ip }).catch(() => ({ success: true }));
+      if (!success) return json({ error: "rate" }, { ...h, ...NO_STORE, "Retry-After": "60" }, 429);
+    }
     const no = (url.searchParams.get("no") || "").replace(/[^0-9A-Za-z]/g, "").toUpperCase().slice(0, 30);
     if (no.length < 8) return json({ error: "bad number" }, h, 400);
     let key, run;
@@ -101,8 +118,8 @@ export default {
     let res = await cache.match(ck);
     if (!res) {
       let body;
-      try { body = await run(); } catch (e) { return json({ error: "upstream", detail: String(e && e.message || e).slice(0, 300) }, { ...h, "Cache-Control": "no-store" }, 502); }
-      if (body.error === "auth") return json({ error: "auth" }, { ...h, "Cache-Control": "no-store" }, 502);
+      try { body = await run(); } catch (e) { return json({ error: "upstream", detail: String(e && e.message || e).slice(0, 300) }, { ...h, ...NO_STORE }, 502); }
+      if (body.error) return json(body.error === "auth" ? { error: "auth" } : body, { ...h, ...NO_STORE }, 502); // no upstream failure is ever cached as an answer
       res = json({ ...body, at: new Date().toISOString() }, h); ctx.waitUntil(cache.put(ck, res.clone()));
     }
     const out = new Response(res.body, res); for (const [k, v] of Object.entries(h)) out.headers.set(k, v); return out;

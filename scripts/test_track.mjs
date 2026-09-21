@@ -65,3 +65,16 @@ assert.equal(M.customsPhase(live), 0); assert.equal(M.taxLikely(live), false);
 const cleared = { found: true, general: { status: '통관목록심사완료', progress: '반출완료' }, steps: [{ kind: '반출신고' }] };
 assert.equal(M.customsPhase(cleared), 1); assert.equal(M.stage(cleared, { events: [] }), 1);
 console.log('test_track real-names ok');
+// GPT-6 Pro 2026-09-21: 송장 등록 is not possession; 보세운송 반출 is not clearance; stall time = newest of both sides
+const inProgress = { found: true, general: { status: '통관목록접수', progress: '통관목록접수' }, steps: [{ kind: '통관목록접수', at: '20260917103100' }] };
+assert.equal(M.stage(inProgress, { last: { code: 'INFORMATION_RECEIVED', time: '2026-09-16T01:00:00+09:00' } }), 0, '송장 등록 keeps the customs stage');
+assert.equal(M.stage(null, { last: { code: 'INFORMATION_RECEIVED' } }), -1, '송장 등록 alone is not a known stage');
+const bonded = { found: true, general: { status: '보세운송', progress: '보세운송' }, steps: [{ kind: '반출신고', text: '보세운송' }] };
+assert.equal(M.customsPhase(bonded), 0, '반출 for 보세운송 is not cleared');
+const bondedStep = { found: true, general: { status: '반입신고', progress: '반입' }, steps: [{ kind: '반출신고', text: '보세운송을 위한 반출' }] };
+assert.equal(M.customsPhase(bondedStep), 0);
+assert.equal(M.customsPhase({ found: true, general: { status: '', progress: '' }, steps: [{ kind: '보세운송신고 수리' }, { kind: '반출완료' }] }), 1, 'a later plain 반출 after 보세운송 수리 still clears');
+const lp = M.lastProgress(inProgress, { last: { code: 'IN_TRANSIT', time: '2026-09-18T10:00:00+09:00' } });
+assert.equal(lp.getTime(), new Date('2026-09-18T10:00:00+09:00').getTime(), 'carrier scan newer than customs step wins');
+assert.equal(M.lastProgress(inProgress, { events: [] }).getTime(), new Date(2026, 8, 17, 10, 31).getTime());
+console.log('test_track gpt-2026-09-21 ok');

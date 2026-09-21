@@ -113,9 +113,12 @@
       gap = Math.max(0, daysBetween(main.date, arrive)); // ordering today still leaves this many empty days
     }
     const rate = base && o.rates ? o.rates[base] : null;
-    const arriving = arrivals.reduce((s, a) => s + (+a.qty || 0), 0);
+    // only stock that lands inside the lead + cover window offsets the order; a shipment due after that window is not this order's cover (GPT-6 Pro 2026-09-21)
+    const horizon = addDays(t, lead + cover);
+    const arriving = arrivals.filter(a => a.date >= t && a.date <= horizon).reduce((s, a) => s + (+a.qty || 0), 0);
+    const arrivingLater = arrivals.reduce((s, a) => s + (+a.qty || 0), 0) - arriving;
     const qty = rate > 0 ? Math.max(0, Math.ceil(rate * (lead + cover) - stock0 - arriving)) : null;
-    return { base, rate, stock0, arriving, by: out, main, range, spread, orderBy, gap, lead, cover, buffer, qty, past: orderBy != null && orderBy < t };
+    return { base, rate, stock0, arriving, arrivingLater, by: out, main, range, spread, orderBy, gap, lead, cover, buffer, qty, past: orderBy != null && orderBy < t };
   }
 
   root.RgStock = { ymd, parse, addDays, daysBetween, today, velocity, weekly, STAGES, MIN_SAMPLES, medians, totalLead, eta, forecast, median };

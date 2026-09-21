@@ -7,7 +7,8 @@
     { id: 'kr.cjlogistics', name: 'CJ대한통운' }, { id: 'kr.hanjin', name: '한진택배' }, { id: 'kr.lotte', name: '롯데택배' },
     { id: 'kr.logen', name: '로젠택배' }, { id: 'kr.epost', name: '우체국택배' }, { id: 'kr.kdexp', name: '경동택배' },
   ];
-  const DELIVERY = { INFORMATION_RECEIVED: 2, AT_PICKUP: 2, IN_TRANSIT: 3, OUT_FOR_DELIVERY: 3, ATTEMPT_FAIL: 3, AVAILABLE_FOR_PICKUP: 3, EXCEPTION: 3, DELIVERED: 4 };
+  // INFORMATION_RECEIVED (송장 등록) is paperwork the carrier gets before customs even starts on 해상특송 — it must not read as 택배 인수 (GPT-6 Pro 2026-09-21)
+  const DELIVERY = { AT_PICKUP: 2, IN_TRANSIT: 3, OUT_FOR_DELIVERY: 3, ATTEMPT_FAIL: 3, AVAILABLE_FOR_PICKUP: 3, EXCEPTION: 3, DELIVERED: 4 };
   const DELIVERY_KO = { INFORMATION_RECEIVED: '송장 등록', AT_PICKUP: '집화', IN_TRANSIT: '이동 중', OUT_FOR_DELIVERY: '배송 출발', ATTEMPT_FAIL: '배송 실패', AVAILABLE_FOR_PICKUP: '수령 대기', EXCEPTION: '문제 발생', DELIVERED: '배송 완료', UNKNOWN: '' };
 
   // 통관 step names as UNIPASS writes them (cargTrcnRelaBsopTpcd / csclPrgsStts), matched by substring in this order.
@@ -41,9 +42,12 @@
   // Customs phase from the general status + steps: 1 = cleared (수리/반출), 0 = in progress, -1 = nothing yet.
   function customsPhase(c) {
     if (!c || !c.found) return -1;
+    const last = (c.steps || []).slice(-1)[0];
+    // 반출 for 보세운송 (moving to another bonded area) is not clearance — checked before any 반출/수리 wording (GPT-6 Pro 2026-09-21)
+    const gen = (c.general && (c.general.progress + ' ' + c.general.status)) || '';
+    if (/보세운송/.test(gen) || (last && /보세운송/.test((last.kind || '') + ' ' + (last.text || '')) && !/수리/.test(last.kind || ''))) return 0;
     const g = explain(c.general && (c.general.progress || c.general.status));
     if (g && g.phase === 1) return 1;
-    const last = (c.steps || []).slice(-1)[0];
     const s = last && explain(last.kind || last.text);
     if (s && s.phase === 1) return 1;
     return 0;
@@ -56,9 +60,17 @@
     if (last && DELIVERY[last.code] != null) return DELIVERY[last.code];
     return customsPhase(c);
   }
+  // Latest moment anything moved (carrier scan or customs step) — the stall check runs on this, whichever side is newer.
+  function lastProgress(c, d) {
+    const ev = d && (d.last || (d.events || []).slice(-1)[0]);
+    const te = ev && ev.time ? new Date(ev.time) : null;
+    const step = (c && c.steps || []).slice(-1)[0];
+    const tc = dttm((step && step.at) || (c && c.general && c.general.updated));
+    return [te, tc].filter(t => t && !isNaN(t)).sort((a, b) => b - a)[0] || null;
+  }
   // 12-digit CJ numbers are the common case; anything 8–30 alphanumerics is passed through (한진 12, 롯데 12, 우체국 13, 로젠 11).
   const clean = s => String(s || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase().slice(0, 30);
   const valid = s => clean(s).length >= 8;
 
-  root.TrackModel = { STAGES, CARRIERS, DELIVERY, DELIVERY_KO, GLOSSARY, explain, dttm, fmt, fmtDay, ago, customsPhase, taxLikely, stage, clean, valid };
+  root.TrackModel = { STAGES, CARRIERS, DELIVERY, DELIVERY_KO, GLOSSARY, explain, dttm, fmt, fmtDay, ago, customsPhase, taxLikely, stage, lastProgress, clean, valid };
 })(typeof window !== 'undefined' ? window : globalThis);

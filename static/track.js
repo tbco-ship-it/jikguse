@@ -64,8 +64,8 @@
     const [c, d] = await Promise.all([getJSON(`/customs?no=${no}&yy=${yy}`).catch(e => ({ error: 'net' })), getJSON(`/track?carrier=${carrier}&no=${no}`).catch(e => ({ error: 'net' }))]);
     if (my !== epoch) return;
     // a January query for a December arrival: try last year's 입항 too
-    let cc = c;
-    if (cc && cc.available && cc.found === false && new Date().getMonth() < 2) { const p = await getJSON(`/customs?no=${no}&yy=${+yy - 1}`).catch(() => null); if (my !== epoch) return; if (p && p.found) cc = p; }
+    let cc = c && typeof c === 'object' ? { ...c, queryYear: +yy } : c;
+    if (cc && cc.available && cc.found === false && new Date().getMonth() < 2) { const p = await getJSON(`/customs?no=${no}&yy=${+yy - 1}`).catch(() => null); if (my !== epoch) return; if (p && p.found) cc = { ...p, queryYear: +yy - 1 }; } // the 원문 link must carry the year that answered (GPT-6 Pro 2026-09-21)
     goBtn.disabled = false; goBtn.textContent = '조회';
     render(no, carrier, cc, d);
     if ((cc && cc.found) || (d && d.events && d.events.length)) remember(no, carrier, cc && cc.found && cc.general.item ? cc.general.item : '');
@@ -84,6 +84,7 @@
 
     // headline: where it is now + since when
     let title, text, cls = 'quiet';
+    const infoOnly = lastEv && lastEv.code === 'INFORMATION_RECEIVED'; // carrier knows the number, has not touched the parcel
     if (lastEv && M.DELIVERY[lastEv.code] != null) {
       const t = new Date(lastEv.time);
       title = `${M.DELIVERY_KO[lastEv.code] || lastEv.name || '배송 중'} · ${M.ago(t, now)}`;
@@ -92,11 +93,12 @@
     } else if (c && c.found) {
       const g = M.explain(c.general.progress || c.general.status) || M.explain(lastStep && lastStep.kind);
       const t = M.dttm((lastStep && lastStep.at) || c.general.updated);
-      const days = t ? (now - t) / 864e5 : 0;
       title = `${g ? g.label : (c.general.progress || c.general.status)} · ${M.ago(t, now)}`;
       text = g ? g.what : '관세청에 등록된 단계입니다.';
       if (st === 1) text = `통관은 끝났어요. ${carrierName(carrier)} 집화 스캔이 찍히면 배송 구간이 채워집니다.`;
-      else if (days >= 3) { text += ` 이 단계에서 ${Math.floor(days)}일째 멈춰 있어요 — 보통보다 긴 편이라 특송·배대지 업체에 확인해 볼 만합니다.`; cls = 'mild'; }
+      if (infoOnly) text += ` ${carrierName(carrier)}에는 송장번호만 등록돼 있고 아직 물품을 넘겨받지 않았어요.`;
+    } else if (infoOnly) {
+      title = `송장 등록 · ${M.ago(new Date(lastEv.time), now)}`; text = `${carrierName(carrier)}에 번호만 등록됐고 아직 물품을 넘겨받지 않았어요. 관세청에는 기록이 없어 통관 단계는 알 수 없습니다.`;
     } else if (c && c.available === false && !(d && d.events && d.events.length)) {
       title = '아직 정보가 없어요'; text = '택배사 조회에 이 번호가 없습니다. 통관 조회는 준비 중이라, 관세청 유니패스에서 바로 확인할 수 있어요.';
     } else if ((c && c.error) || (d && d.error)) {
@@ -105,12 +107,15 @@
       title = '아직 등록 전이에요'; text = '관세청과 택배사 어디에도 이 번호가 없어요. 특송업체가 통관목록을 내기 전이거나(보통 출항 전후), 번호가 다른 구간의 것일 수 있어요. 하루쯤 뒤에 다시 확인해 보세요.';
     }
 
+    // 3일 이상 아무 쪽도 안 움직였으면 단계와 무관하게 알린다 — 통관 중이든, 이동 중이든, 통관 후 집화 대기든 (GPT-6 Pro 2026-09-21)
+    const lp = M.lastProgress(c, d), stalled = st >= 0 && st < 4 && lp && (now - lp) / 864e5 >= 3;
+    if (stalled) { const dd = Math.floor((now - lp) / 864e5); text += ` 마지막 움직임이 ${dd}일 전이라 보통보다 긴 편이에요 — ${st >= 2 ? carrierName(carrier) + ' 고객센터' : '특송·배대지 업체'}에 확인해 볼 만합니다.`; if (cls === 'quiet') cls = 'mild'; }
     // stepper
     const stepper = `<ol class="steps" aria-label="진행 단계">${M.STAGES.map((s, i) => `<li class="${i < st ? 'done' : i === st ? 'now' : ''}"><span class="dot"></span><span class="lbl">${s}</span></li>`).join('')}</ol>`;
 
     // customs card
     let cust;
-    const uniLink = `https://unipass.customs.go.kr/csp/index.do?tgMenuId=MYC_MNU_00000450&hblNo=${encodeURIComponent(no)}&blYy=${now.getFullYear()}`;
+    const uniLink = `https://unipass.customs.go.kr/csp/index.do?tgMenuId=MYC_MNU_00000450&hblNo=${encodeURIComponent(no)}&blYy=${(c && c.queryYear) || now.getFullYear()}`;
     if (c && c.found) {
       const g = c.general;
       const meta = [g.item && `품명 ${g.item}`, g.from && `${g.from}${g.fromCountry ? ' (' + g.fromCountry + ')' : ''} → ${g.port || '한국'}`, g.arrived && `입항 ${M.fmtDay(M.dttm(g.arrived))}`, g.blType, g.carrier].filter(Boolean);

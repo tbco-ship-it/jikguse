@@ -13,7 +13,33 @@
   const host = $('rg-host'), base = host.dataset.base;
   const FEES = await (await fetch(host.dataset.fees)).json();
   const STORE_KEY = 'jikguse.rg.wing', MAX_SNAPS = 120;
-  const load = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || { items: {} }; } catch (e) { return { items: {} }; } };
+  // Every stored item goes through this shape check — on receive from Wing and again on load, so a backup file edited by hand
+  // (가져오기) cannot put markup where the chips expect numbers (GPT-6 Pro 2026-09-21: stored XSS via avail/inbound/d30.sold).
+  const num = v => (v == null || v === '' ? null : (isFinite(+v) ? +v : null));
+  const str = (v, n) => (v == null ? null : String(v).slice(0, n || 200));
+  const box = b => b && typeof b === 'object' ? { sold: num(b.sold), gmv: num(b.gmv), views: num(b.views), canc: num(b.canc) } : null;
+  const sanitizeItem = it => {
+    if (!it || typeof it !== 'object' || it.id == null) return null;
+    const u = {}; if (it.series && it.series.u && typeof it.series.u === 'object') for (const [d, q] of Object.entries(it.series.u)) if (/^\d{4}-\d{2}-\d{2}$/.test(d) && num(q) != null) u[d] = num(q);
+    return {
+      id: str(it.id, 40), pid: str(it.pid, 40), iid: str(it.iid, 40), name: str(it.name, 200), opt: str(it.opt, 200), reg: str(it.reg, 40), at: str(it.at, 40),
+      avail: num(it.avail), inbound: num(it.inbound), doc: num(it.doc), ret30: num(it.ret30),
+      price: it.price && typeof it.price === 'object' ? { list: num(it.price.list), final: num(it.price.final) } : null,
+      cost: it.cost && typeof it.cost === 'object' ? { unit: num(it.cost.unit), take: num(it.cost.take), wh: num(it.cost.wh), ff: num(it.cost.ff), storageMonth: num(it.cost.storageMonth) } : null,
+      rec: it.rec && typeof it.rec === 'object' ? { qty: num(it.rec.qty), days: num(it.rec.days) } : null,
+      ret: it.ret && typeof it.ret === 'object' ? { rate: num(it.ret.rate), month: num(it.ret.month), units: num(it.ret.units), returns: num(it.ret.returns) } : null,
+      cat: it.cat && typeof it.cat === 'object' ? { code: str(it.cat.code, 40), kan: str(it.cat.kan, 40), path: str(it.cat.path, 300) } : null,
+      y: box(it.y), d7: box(it.d7), d30: box(it.d30),
+      series: it.series && typeof it.series === 'object' ? { from: str(it.series.from, 20), to: str(it.series.to, 20), at: str(it.series.at, 40), u } : null,
+      snaps: Array.isArray(it.snaps) ? it.snaps.filter(s => s && typeof s === 'object').map(s => ({ date: str(s.date, 20), avail: num(s.avail), inbound: num(s.inbound) })).slice(-MAX_SNAPS) : [],
+    };
+  };
+  const sanitizeStore = st => {
+    const out = { items: {}, at: str(st && st.at, 40), today: str(st && st.today, 20), vendor: str(st && st.vendor, 100), cur: str(st && st.cur, 40) };
+    if (st && st.items && typeof st.items === 'object') for (const [k, v] of Object.entries(st.items)) { const it = sanitizeItem(v); if (it && it.id === String(k).slice(0, 40)) out.items[k] = it; }
+    return out;
+  };
+  const load = () => { try { return sanitizeStore(JSON.parse(localStorage.getItem(STORE_KEY))); } catch (e) { return { items: {} }; } };
   const save = st => { try { localStorage.setItem(STORE_KEY, JSON.stringify(st)); return true; } catch (e) { return false; } };
   const fmtAt = iso => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   let store = load(), cur = null; // cur = 옵션ID string of the selected item, null = 직접 입력
@@ -39,9 +65,10 @@
     try { e.source.postMessage({ type: 'jikguse-rg-got' }, e.origin); } catch (err) { /* the Wing tab is gone */ }
     const today = d.today || window.RgStock.today();
     let fresh = 0;
-    for (const it of d.items) {
-      if (it == null || it.id == null) continue;
-      const id = String(it.id), old = store.items[id] || {};
+    for (const raw of d.items) {
+      const it = sanitizeItem(raw);
+      if (!it) continue;
+      const id = it.id, old = store.items[id] || {};
       // daily series: merge by date so an older, longer history survives a later short pull; today's partial row is replaced next time
       const u = Object.assign({}, old.series && old.series.u, it.series && it.series.u);
       const keys = Object.keys(u).sort(); while (keys.length > 400) delete u[keys.shift()];
@@ -68,7 +95,7 @@
     const chip = (id, name, small, on) => `<button type="button" class="chip${on ? ' on' : ''}" role="tab" aria-selected="${on}" data-id="${esc(id == null ? '' : id)}" title="${esc(name)}"><span>${esc(name)}</span><small>${small}</small></button>`;
     chips.innerHTML = ids.map(id => {
       const it = store.items[id], ev = window.RgWidget.evaluate(FEES, JSON.parse(localStorage.getItem('jikguse.rg.p.' + id) || '{}'));
-      const sold = it.d30 && it.d30.sold != null ? `30일 ${it.d30.sold}개` : '', stock = `재고 ${it.avail}${it.inbound ? `+${it.inbound}` : ''}`;
+      const sold = it.d30 && it.d30.sold != null ? `30일 ${+it.d30.sold}개` : '', stock = `재고 ${+it.avail || 0}${it.inbound ? `+${+it.inbound}` : ''}`;
       return chip(id, [it.name, it.opt && it.opt !== '단일상품' ? it.opt : null].filter(Boolean).join(' · '), `${sold ? sold + ' · ' : ''}${stock}${ev.ok ? ` → 개당 <b class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected)}</b>` : ' · 판매가 입력 전'}`, cur === id);
     }).join('') + chip(null, '직접 입력', '윙 상품이 아닌 계산', cur == null);
     chips.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => { select(b.dataset.id || null); host.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));

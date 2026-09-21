@@ -56,7 +56,12 @@
   // ----- lines -----
   const KEY = 'jikguse.biz';
   const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
-  const lines = (saved.lines && saved.lines.length ? saved.lines : [{ hs: '', qty: '', price: '' }]).map(l => ({ ...l, entry: null })); // name = 품명 as typed on the forwarder sheet (empty when keyed by hand)
+  // id = the 로켓그로스 slot key for this line, fixed at creation so editing 단가·품명 or two look-alike lines never share a slot (GPT-6 Pro 2026-09-21).
+  // Saves from before ids carry their old HS:price key so existing slots still open.
+  const newId = () => 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const newLine = () => ({ id: newId(), hs: '', qty: '', price: '', entry: null });
+  const lines = (saved.lines && saved.lines.length ? saved.lines : [{ hs: '', qty: '', price: '' }]).map(l => ({ ...l, id: l.id || (l.hs && l.price ? l.hs + ':' + l.price : newId()), entry: null })); // name = 품명 as typed on the forwarder sheet (empty when keyed by hand)
+  const amt = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }; // '1,000' is 1000, not 1 (GPT-6 Pro 2026-09-21)
 
   function lineHtml(i) {
     return `<div class="line" data-i="${i}">
@@ -102,7 +107,7 @@
       if (!code || code.length !== 6) return false;
       const r = BizCalc.resolveH6(HS.codes, code);
       if (r.entry) { L.h6 = r.n > 1 ? r.n : 0; choose(r.entry); return true; }
-      if (r.n > 1) { open(code, `하위 코드 ${r.n}개의 세율이 달라요 — 맞는 것을 골라 주세요`); return true; }
+      if (r.n > 1) { open(code, r.same ? `하위 코드 ${r.n}개 — 세율은 같지만 세관장확인 요건이 코드마다 달라요, 맞는 것을 골라 주세요` : `하위 코드 ${r.n}개의 세율이 달라요 — 맞는 것을 골라 주세요`); return true; }
       return false;
     };
     const close = () => { menu.hidden = true; active = -1; input.setAttribute('aria-expanded', 'false'); };
@@ -119,9 +124,9 @@
     input.addEventListener('blur', () => setTimeout(() => { close(); if (L.entry) input.value = nameOf(L.entry); }, 120));
     qty.addEventListener('input', () => { L.qty = qty.value; render(); });
     price.addEventListener('input', () => { L.price = price.value; render(); });
-    el.querySelector('.rm').addEventListener('click', () => { lines.splice(i, 1); if (!lines.length) lines.push({ hs: '', qty: '', price: '', entry: null }); mountAll(); render(); });
+    el.querySelector('.rm').addEventListener('click', () => { lines.splice(i, 1); if (!lines.length) lines.push(newLine()); mountAll(); render(); });
     if (HS && L.hs && byCode[L.hs]) choose(byCode[L.hs], false);
-    else if (L.pending) { input.value = L.pending; meta.textContent = `HS ${L.pending} 하위 코드 세율이 달라요 — 눌러서 골라 주세요`; }
+    else if (L.pending) { input.value = L.pending; meta.textContent = `HS ${L.pending} 하위 10자리 코드를 눌러서 골라 주세요 — 세율이나 수입요건이 코드마다 달라요`; }
     el.__setMeta = setMeta;
   }
   function mountAll() {
@@ -130,7 +135,7 @@
     linesEl.querySelectorAll('.cur-l').forEach(s => { s.textContent = $('cur').value; });
     linesEl.querySelectorAll('.rm').forEach(b => { b.hidden = lines.length === 1; });
   }
-  $('add').addEventListener('click', () => { lines.push({ hs: '', qty: '', price: '', entry: null }); mountAll(); const last = linesEl.querySelector('.line:last-child .hs'); if (last && !last.disabled) last.focus(); });
+  $('add').addEventListener('click', () => { lines.push(newLine()); mountAll(); const last = linesEl.querySelector('.line:last-child .hs'); if (last && !last.disabled) last.focus(); });
 
   // ----- shipment fields -----
   const origin = $('origin');
@@ -155,7 +160,7 @@
   // 초기화: 저장된 입력을 지우고 빈 계산기로 (페이지를 오가도 마지막 입력이 남는 게 기본이라 따로 둔다)
   $('reset').addEventListener('click', () => {
     localStorage.removeItem(KEY);
-    lines.length = 0; lines.push({ hs: '', qty: '', price: '', entry: null });
+    lines.length = 0; lines.push(newLine());
     ['total', 'excl', 'ins', 'paste-text'].forEach(id => { $(id).value = ''; });
     $('co').checked = false; $('frcur').value = 'KRW'; syncFrcur();
     $('paste-note').textContent = ''; $('bm-note').textContent = '';
@@ -174,21 +179,29 @@
     const P = BizCalc.parseSheet($('paste-text').value), note = $('paste-note');
     if (!P.lines.length && !P.totalKrw) { note.textContent = '품목(HS코드·수량·단가)이나 배송비를 찾지 못했어요. HS코드가 보이는 신청서 화면을 통째로 복사해 주세요. 배대지 화면이 안 읽히면 hello@jikguse.com으로 그 화면 텍스트를 보내 주시면 맞춰 드립니다.'; return; }
     if (P.lines.length) {
-      const unresolved = [];
+      const unresolved = [], converted = [];
       lines.length = 0;
+      // a pasted sheet is a new shipment: C/O and 배송비 from the previous one must not linger (GPT-6 Pro 2026-09-21)
+      $('co').checked = !!P.co; $('total').value = ''; $('excl').value = '';
+      if (P.cur && FX[P.cur]) $('cur').value = P.cur;
+      const cur = $('cur').value;
       for (const l of P.lines) {
-        const r = BizCalc.resolveH6(HS.codes, l.h6);
-        lines.push({ hs: r.entry ? r.entry.c : '', qty: String(l.qty), price: String(l.price), name: l.name || '', entry: null, pending: r.entry ? '' : l.h6, h6: r.entry && r.n > 1 ? r.n : 0 });
+        // a full 10-digit code on the sheet is used as is; a 6-digit one resolves only when unambiguous
+        const direct = l.h10 && byCode[l.h10];
+        const r = direct ? { entry: byCode[l.h10], n: 1 } : BizCalc.resolveH6(HS.codes, l.h6);
+        // a line quoted in another currency (원, JPY on a CNY sheet…) is converted into the sheet currency at this week's 과세환율
+        let price = l.price;
+        if (l.cur && l.cur !== cur && (l.cur === 'KRW' ? 1 : FX[l.cur]) && FX[cur]) { price = Math.round(l.price * (l.cur === 'KRW' ? 1 : FX[l.cur]) / FX[cur] * 100) / 100; converted.push(`${l.name || l.h6} ${l.price.toLocaleString('ko-KR')} ${l.cur} → ${price.toLocaleString('ko-KR')} ${cur}`); }
+        lines.push({ id: newId(), hs: r.entry ? r.entry.c : '', qty: String(l.qty), price: String(price), name: l.name || '', entry: null, pending: r.entry ? '' : l.h6, h6: r.entry && r.n > 1 ? r.n : 0 });
         if (!r.entry) unresolved.push(l.h6);
       }
-      if (P.cur && FX[P.cur]) $('cur').value = P.cur;
       if (P.origin) origin.value = P.origin;
       mountAll();
       linesEl.querySelectorAll('.cur-l').forEach(s => { s.textContent = $('cur').value; });
       const bits = [`${P.lines.length}개 품목 채움`];
       if (P.declared) bits.push(Math.abs(P.declared.amount - P.goods) < 0.01 ? `신청서 총구매비 ${P.declared.amount.toLocaleString('ko-KR')} ${P.declared.cur} 일치` : `합계 ${P.goods.toLocaleString('ko-KR')} ${P.cur} — 신청서 총구매비 ${P.declared.amount.toLocaleString('ko-KR')}와 다름, 수량을 확인하세요`);
       if (unresolved.length) bits.push(`HS ${unresolved.join(', ')}는 10자리를 골라 주세요`);
-      if (P.mixed) bits.push(`단가 통화가 섞여 있어요 — ${P.cur} 기준으로 넣었으니 다른 통화 줄은 단가를 고쳐 주세요`);
+      if (converted.length) bits.push(`통화가 다른 줄은 과세환율로 바꿔 넣었어요: ${converted.join(', ')}`);
       note.textContent = bits.join(' · ');
     } else note.textContent = '';
     // 배대지 청구서는 원화: 품목만 채워졌어도 운임 통화를 KRW로 맞춘다 (예전 저장값 USD가 남아 헷갈렸던 건)
@@ -197,7 +210,7 @@
       $('total').value = String(P.totalKrw); $('excl').value = String(P.exclKrw || '');
       $('paste-note').textContent += `${$('paste-note').textContent ? ' · ' : ''}배송비 ${P.totalKrw.toLocaleString('ko-KR')}원${P.exclKrw ? ` 중 과세 제외 ${P.exclKrw.toLocaleString('ko-KR')}원` : ' (결제·견적 화면도 붙이면 부가서비스를 뺍니다)'}`;
     }
-    if (P.co) $('co').checked = true;
+    if (P.co) $('co').checked = true; // a 결제정보-only paste can add the certificate to the sheet already loaded
     rerender();
     if (P.lines.length) out.scrollIntoView({ behavior: 'smooth', block: 'start' }); // the sheet is below the form — take the reader to the number
   });
@@ -219,8 +232,10 @@
   hsReady.then(fromHash);
 
   function save() {
-    localStorage.setItem(KEY, JSON.stringify({ lines: lines.map(l => ({ hs: l.hs, qty: l.qty, price: l.price, name: l.name || '' })), origin: origin.value, cur: $('cur').value, frcur: $('frcur').value,
-      total: $('total').value, excl: $('excl').value, ins: $('ins').value, co: $('co').checked }));
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ lines: lines.map(l => ({ id: l.id, hs: l.hs, qty: l.qty, price: l.price, name: l.name || '' })), origin: origin.value, cur: $('cur').value, frcur: $('frcur').value,
+        total: $('total').value, excl: $('excl').value, ins: $('ins').value, co: $('co').checked }));
+    } catch (e) { /* storage full or blocked — the calculation below must still repaint (GPT-6 Pro 2026-09-21) */ }
   }
 
   // ----- result -----
@@ -231,21 +246,18 @@
     const frcur = $('frcur').value, frFx = frcur === 'KRW' ? 1 : FX[frcur];
     const total = num($('total')), excl = Math.min(num($('excl')), total);
     const input = { fx: FX, cur, cols: HS.cols, origin: origin.value, co: $('co').checked, freight: total - excl, freightCur: frcur, insurance: num($('ins')),
-      brokerageKrw: Math.round(excl * frFx), domesticKrw: 0, lines: lines.map(l => ({ entry: l.entry, name: l.name, qty: parseFloat(l.qty) || 0, price: parseFloat(l.price) || 0 })) };
+      brokerageKrw: Math.round(excl * frFx), domesticKrw: 0, lines: lines.map(l => ({ id: l.id, entry: l.entry, name: l.name, qty: amt(l.qty), price: amt(l.price) })) };
     const r = BizCalc.compute(input);
     if (!r.lines.length) {
-      out.innerHTML = `<section class="sheet balanced quiet"><p class="sheet-label">예상 세액</p><p class="sheet-title">품목·수량·단가를 넣으면 바로 계산됩니다</p><p class="sheet-text">사업자 일반 수입신고 기준 — 150달러 면세·목록통관·간이세율은 적용하지 않습니다. 이번 주 과세환율 USD ${FX.USD.toLocaleString('ko-KR')}원.</p></section>`;
+      out.innerHTML = `<section class="sheet balanced quiet"><p class="sheet-label">예상 세액</p><p class="sheet-title">${r.pending ? `${r.pending}개 품목의 HS 10자리 코드를 고르면 계산됩니다` : '품목·수량·단가를 넣으면 바로 계산됩니다'}</p><p class="sheet-text">사업자 일반 수입신고 기준 — 150달러 면세·목록통관·간이세율은 적용하지 않습니다. 이번 주 과세환율 USD ${FX.USD.toLocaleString('ko-KR')}원.</p></section>`;
       rgItems = []; $('rg-panel').hidden = true;
       return;
     }
     const orig = BizCalc.ORIGINS.find(o => o.k === origin.value);
     // 개당 원가(VAT 제외) = (과세가격 + 관세 + 과세 제외 부가서비스 안분) ÷ 수량 → 로켓그로스 계산기로 넘긴다
     const unitCost = l => (l.cif + l.duty + (r.cif ? r.brokerage * l.cif / r.cif : 0)) / (l.qty || 1);
-    // slot id = HS:매입단가 (kept so existing saved slots survive); two sheet lines with the same pair get the 품명 appended so they
-    // stop sharing one 로켓그로스 slot (GPT-6 Pro review 2026-09-21)
-    const baseId = l => l.entry.c + ':' + l.price;
-    const dupIds = new Set(r.lines.map(baseId).filter((id, i, a) => a.indexOf(id) !== i));
-    const idOf = l => dupIds.has(baseId(l)) ? baseId(l) + ':' + (l.name || '') : baseId(l);
+    // slot id = the line's own id (see newId) — never derived from HS·단가·품명, so look-alike lines keep separate 로켓그로스 slots
+    const idOf = l => l.id;
     const rows = r.lines.map(l => `<tr><th><span class="ln">${esc(l.name || nameOf(l.entry))}</span><small>${l.name ? esc(nameOf(l.entry)) + ' · ' : ''}${fmtHs(l.entry.c)} · ${l.qty.toLocaleString('ko-KR')} × ${l.price.toLocaleString('ko-KR')} ${cur}</small><small><button type="button" class="rg-link" data-id="${esc(idOf(l))}">개당 ${won(unitCost(l))} → 로켓그로스 수익 보기</button></small></th><td data-l="과세가격">${won(l.cif)}</td><td data-l="세율">${pct(l.rate.applied.rate)}<small>${esc(l.rate.applied.label)}</small></td><td data-l="관세">${won(l.duty)}</td><td data-l="부가세">${won(l.vat)}</td></tr>`).join('');
     const notes = [];
     if (input.co && r.ftaLines) notes.push(`협정세율 ${r.ftaLines}개 품목 — 수입신고 때 ${esc(orig.name)} 원산지증명서(C/O)를 제출해야 합니다. 원산지 기준(역내 부가가치·세번 변경)을 못 채우면 기본세율로 돌아갑니다.`);
@@ -256,10 +268,13 @@
     }
     if (r.staleLines) notes.push(`${r.staleLines}개 품목의 협정세율은 자료 기준일 이후 한 단계 더 내려갔을 수 있습니다(관세청 관세율표 갱신 전). 관세청 CLIP에서 현재 세율을 확인하세요.`);
     if (r.specificLines) notes.push(`${r.specificLines}개 품목은 종량세(㎏·ℓ당 세액)가 함께 적용되는 품목입니다. 여기 관세는 종가세 부분만이라 실제 세액이 더 클 수 있습니다.`);
+    if (r.vatExemptLines) notes.push(`${r.vatExemptLines}개 품목(도서·신문·잡지, HS 4901~4904)은 수입 부가세 면제로 계산했습니다(부가가치세법 제27조). 광고물·인쇄 문구류는 면제가 아니니 품목을 확인하세요.`);
     const reqLines = r.lines.filter(l => l.req);
     const reqBlock = reqLines.length ? `<div class="req" id="req"><p class="sheet-title">세관장확인 대상 ${reqLines.length}개 품목 — 수입요건 먼저 확인</p><p class="sheet-text">관세법 제226조에 따라 신고 전에 요건승인기관 확인이 필요합니다. 요건이 없으면 통관이 보류됩니다.</p><ul class="req-list">${reqLines.map(l => `<li data-hs="${l.entry.c}"><b>${esc(nameOf(l.entry))}</b> <small>${fmtHs(l.entry.c)}</small><div class="req-body muted small">불러오는 중…</div></li>`).join('')}</ul></div>` : '';
-    out.innerHTML = `<section class="sheet ${r.tax ? 'moderate' : 'balanced'}"><p class="sheet-label">예상 세액 (관세 + 부가세)</p><div class="sheet-num"><span class="num">${Math.round(r.tax).toLocaleString('ko-KR')}</span><span class="pct">원</span></div>
-      <p class="sheet-title">관세 ${won(r.duty)} + 부가세 ${won(r.vat)} · 총 착지비용 ${won(r.landed)}</p>
+    // priced lines still waiting for a 10-digit code are outside every number on this sheet — say so next to the headline, not in a footnote
+    const pendingNote = r.pending ? `<p class="sheet-text tip"><strong>${r.pending}개 품목(물품가 ${won(r.pendingKrw)})은 HS 코드가 정해지지 않아 아래 세액·착지비용에 빠져 있어요.</strong> 위에서 10자리 코드를 고르면 합산됩니다.</p>` : '';
+    out.innerHTML = `<section class="sheet ${r.tax ? 'moderate' : 'balanced'}"><p class="sheet-label">예상 세액 (관세 + 부가세)${r.pending ? ' · 일부 품목 제외' : ''}</p><div class="sheet-num"><span class="num">${Math.round(r.tax).toLocaleString('ko-KR')}</span><span class="pct">원</span></div>
+      <p class="sheet-title">관세 ${won(r.duty)} + 부가세 ${won(r.vat)} · 총 착지비용 ${won(r.landed)}${r.pending ? ' (HS 미확정 품목 제외)' : ''}</p>${pendingNote}
       <p class="sheet-text">부가세 ${won(r.vat)}은 매입세액공제 대상이라 사업자 실부담은 <strong>${won(r.landedNet)}</strong>(물품가 ${won(r.goodsKrw)} + 운임·보험 ${won(r.freightKrw + r.insKrw)} + 관세 ${won(r.duty)}${r.brokerage ? ' + 과세 제외 부가서비스 ' + won(r.brokerage) : ''})입니다. 과세가격 합계 ${won(r.cif)} = 물품가 미화 ${Math.round(r.goodsUsd).toLocaleString('ko-KR')}달러 + 운임 ${won(r.freightKrw)}${r.brokerage ? `(청구액 ${won(Math.round(total * frFx))} − 부가서비스 ${won(r.brokerage)})` : ''}${r.insKrw ? ' + 보험 ' + won(r.insKrw) : ''}, 품목별 물품가 비례 안분.</p>
       ${notes.map(n => `<p class="sheet-text tip">${n}</p>`).join('')}
       <div class="tbl-wrap"><table class="tbl spec biz"><thead><tr><th>품목</th><th>과세가격</th><th>세율</th><th>관세</th><th>부가세</th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -309,11 +324,12 @@
     rows.forEach(({ it, ev }) => { const b = rgChips.querySelector(`.chip[data-id="${CSS.escape(it.id)}"]`); if (!b) return; b.classList.toggle('done', ev.ok); b.querySelector('small').innerHTML = `개당 ${won(it.cost)}${ev.ok ? ` → 순이익 <b class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected)}</b>` : ' · 입력 전'}`; });
     const done = rows.filter(r => r.ev.ok), todo = rows.length - done.length;
     const sum = f => done.reduce((s, r) => s + f(r), 0);
-    const profit = sum(r => r.ev.c.expected * r.it.qty), revenue = sum(r => r.ev.c.sold * r.it.qty), outlayDone = sum(r => r.it.cost * r.it.qty), back = sum(r => (r.it.cost + r.ev.c.expected) * r.it.qty);
+    // per unit of stock, not per sale attempt: a resold return does not use up inventory (perStock = expected × attempts, GPT-6 Pro 2026-09-21)
+    const profit = sum(r => r.ev.c.perStock * r.it.qty), revenue = sum(r => r.ev.c.sold * r.it.qty), outlayDone = sum(r => r.it.cost * r.it.qty), back = sum(r => (r.it.cost + r.ev.c.perStock) * r.it.qty);
     const payback = back > 0 ? outlayDone / back : null; // fraction of the (evaluated) shipment that must sell to get the outlay back
     const chip = id => { rgId = id; syncRg(); rgHost.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => rgW.focus(), 500); };
     const tr = rows.map(({ it, ev }) => `<tr${ev.ok ? '' : ' class="todo"'}><th><span class="ln">${esc(it.name)}</span><small>${it.qty.toLocaleString('ko-KR')}개 · 개당 원가 ${won(it.cost)}</small></th>
-      ${ev.ok ? `<td data-l="판매가">${won(ev.I.price)}</td><td data-l="개당 순이익" class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected)}<small>${(Math.round(ev.c.margin * 1000) / 10).toLocaleString('ko-KR')}%</small></td><td data-l="전부 팔면" class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected * it.qty)}<small>${ev.I.monthly ? `월 ${ev.I.monthly.toLocaleString('ko-KR')}개 팔면 ${it.qty <= ev.I.monthly ? '1개월 안에 소진' : (Math.ceil(it.qty / ev.I.monthly * 10) / 10).toLocaleString('ko-KR') + '개월'}` : ''}</small></td>`
+      ${ev.ok ? `<td data-l="판매가">${won(ev.I.price)}</td><td data-l="개당 순이익" class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.expected)}<small>${(Math.round(ev.c.margin * 1000) / 10).toLocaleString('ko-KR')}%</small></td><td data-l="전부 팔면" class="${ev.c.expected < 0 ? 'neg' : ''}">${won(ev.c.perStock * it.qty)}<small>${ev.I.monthly ? `월 ${ev.I.monthly.toLocaleString('ko-KR')}개 팔면 ${it.qty <= ev.I.monthly ? '1개월 안에 소진' : (Math.ceil(it.qty / ev.I.monthly * 10) / 10).toLocaleString('ko-KR') + '개월'}` : ''}</small></td>`
         : `<td colspan="3" data-l="상태"><button type="button" class="link-btn tot-link" data-id="${esc(it.id)}">카테고리·판매가·사이즈 입력하기 →</button></td>`}</tr>`).join('');
     const tone = !done.length ? 'quiet' : profit <= 0 ? 'severe' : profit / Math.max(1, outlayDone) < 0.1 ? 'moderate' : 'balanced';
     const head = !done.length ? `<p class="sheet-title">품목별 로켓그로스 입력을 채우면 이번 수입 전체 순이익이 여기 합산됩니다</p>`

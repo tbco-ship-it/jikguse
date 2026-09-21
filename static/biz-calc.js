@@ -44,6 +44,9 @@
     { k: 'XX', name: '기타 · 모름', codes: [] }
   ];
   const floor10 = n => Math.floor(n / 10) * 10;
+  // 수입 부가세 면제 품목 (부가가치세법 제27조·시행령 제49조: 도서·신문·잡지·관보·뉴스통신·악보). HS 4901~4904 — 광고물(4911)·인쇄 문구류는 아님.
+  const vatExempt = entry => /^490[1-4]/.test(entry.c);
+  const VAT_RATE = 0.1;
 
   // entry: one record of hs.json codes[]; cols: hs.json cols. Returns the MFN rate, the best agreement rate for the
   // origin (if any), and which one applies given whether a certificate of origin is available.
@@ -74,6 +77,9 @@
     const fx = c => (c === 'KRW' ? 1 : input.fx[c]);
     const goodsFx = fx(input.cur), frFx = fx(input.freightCur || input.cur);
     const lines = input.lines.filter(l => l.entry && l.qty > 0 && l.price > 0);
+    // priced lines without a resolved HS: not in any sum — reported so the caller can say the total is partial (GPT-6 Pro 2026-09-21)
+    const pending = input.lines.filter(l => !l.entry && l.qty > 0 && l.price > 0);
+    const pendingKrw = Math.floor(pending.reduce((s, l) => s + l.qty * l.price * goodsFx, 0));
     const goods = lines.map(l => l.qty * l.price * goodsFx);
     const goodsSum = goods.reduce((s, v) => s + v, 0);
     const freightKrw = (input.freight || 0) * frFx, insKrw = (input.insurance || 0) * frFx;
@@ -82,8 +88,9 @@
       const cif = Math.floor(goods[i] + (freightKrw + insKrw) * share);
       const rt = rateFor(l.entry, input.cols, input.origin, input.co);
       const duty = floor10(cif * rt.applied.rate / 100);
-      const vat = floor10((cif + duty) * 0.1);
-      return { entry: l.entry, name: l.name || '', qty: l.qty, price: l.price, goodsKrw: Math.floor(goods[i]), cif, rate: rt, duty, vat, specific: !!l.entry.u, req: !!l.entry.q };
+      const vatRate = vatExempt(l.entry) ? 0 : VAT_RATE;
+      const vat = floor10((cif + duty) * vatRate);
+      return { id: l.id, entry: l.entry, name: l.name || '', qty: l.qty, price: l.price, goodsKrw: Math.floor(goods[i]), cif, rate: rt, duty, vat, vatRate, specific: !!l.entry.u, req: !!l.entry.q };
     });
     const sum = k => out.reduce((s, x) => s + x[k], 0);
     const duty = sum('duty'), vat = sum('vat');
@@ -99,7 +106,9 @@
       ftaLines: out.filter(x => x.rate.useFta).length,
       staleLines: out.filter(x => x.rate.stale).length,
       specificLines: out.filter(x => x.specific).length,
-      reqLines: out.filter(x => x.req).length
+      reqLines: out.filter(x => x.req).length,
+      vatExemptLines: out.filter(x => x.vatRate === 0).length,
+      pending: pending.length, pendingKrw
     };
   }
 
@@ -110,7 +119,9 @@
     if (!group.length) return { entry: null, n: 0, same: false, group };
     const sig = c => [c.r.join(','), !!c.q, !!c.u].join('|');
     const same = group.every(c => sig(c) === sig(group[0]));
-    return { entry: group.length === 1 || same ? group[0] : null, n: group.length, same, group };
+    // same rates ≠ same 품목: when any row carries 세관장확인 the requirement text differs by 10-digit code, so the user picks (GPT-6 Pro 2026-09-21)
+    const auto = group.length === 1 || (same && !group.some(c => c.q));
+    return { entry: auto ? group[0] : null, n: group.length, same, group };
   }
 
   // Parse text copied from any forwarder's application page (신청서조회 / 결제정보 / 견적 화면). Items are located by an HS
@@ -128,10 +139,14 @@
     let m;
     while ((m = hsRe.exec(t))) {
       const h6 = m[1] || (m[2] ? m[2] + m[3] : m[4] + m[5]);
-      if (!marks.length || marks[marks.length - 1].at !== m.index) marks.push({ h6, at: m.index, len: m[0].length });
+      const digits = m[0].replace(/\D/g, ''), h10 = !m[1] && digits.length === 10 ? digits : ''; // '6204.53.0000' / 'HS 6204530000' → keep the 10 digits
+      if (!marks.length || marks[marks.length - 1].at !== m.index) marks.push({ h6, h10, at: m.index, len: m[0].length });
     }
     const lines = [];
-    let cur = null, mixed = false; // mixed: lines quoted in more than one currency — caller should warn
+    let cur = null, mixed = false; // mixed: lines quoted in more than one currency — the caller converts per line (GPT-6 Pro 2026-09-21)
+    // ¥ is CNY on Chinese forwarders' screens and JPY on Japanese ones: a 3-letter code in the document settles it
+    const docCode = (t.match(/\b(JPY|CNY|USD|EUR|GBP)\b/) || [])[1] || null;
+    if (docCode === 'JPY') { SYM['¥'] = 'JPY'; SYM['￥'] = 'JPY'; }
     // Item name as the seller typed it (feeds the 로켓그로스 category match): the rest of the HS line ("[630710] 안경닦이 · Cleansing
     // glasses · 眼镜擦儿" → 안경닦이), else a 상품명/품명 label just above, else the text before the code on a table row. Hangul first.
     const hasKo = s => /[가-힣]/.test(s);
@@ -156,8 +171,10 @@
       if (!(price > 0 && qty > 0)) return;
       const c = pm[3] ? (SYM[pm[3]] || pm[3].toUpperCase()) : (SYM[pm[1]] || null);
       if (c && c !== 'KRW') { cur = cur || c; if (c !== cur) mixed = true; }
-      const dup = lines.find(l => l.h6 === p.h6 && l.price === price);
-      if (dup) dup.qty += qty; else lines.push({ h6: p.h6, qty, price, name: nameNear(p.at, p.len) });
+      const name = nameNear(p.at, p.len);
+      // same code + same price + same 품명 = one row split across lines; a different 품명 is a different product (own 로켓그로스 slot)
+      const dup = lines.find(l => l.h6 === p.h6 && l.price === price && (l.cur || null) === (c || null) && l.name === name);
+      if (dup) dup.qty += qty; else lines.push({ h6: p.h6, h10: p.h10, qty, price, cur: c, name });
     });
     if (!cur) { const dm = t.match(new RegExp('(?:총구매비|해외구매비|상품금액|물품가|구매금액)\\s*[:：]?\\s*([¥￥$＄€£]?)\\s*[\\d,]+(?:\\.\\d+)?\\s*(' + CODE + ')?')); if (dm) cur = dm[2] ? (SYM[dm[2]] || dm[2].toUpperCase()) : (SYM[dm[1]] || null); if (cur === 'KRW') cur = null; }
     const goods = lines.reduce((s, l) => s + l.qty * l.price, 0);

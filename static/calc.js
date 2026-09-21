@@ -44,21 +44,24 @@
   // ----- tax model (mirror of scripts/model.py) -----
   function compute(item, country, price, ship, fwd, fta, simplified) {
     // 면세 판정 금액 = 물품가 + 현지 배송비 (국제운송비·보험료 제외) — 관세청 소액면세 기준
-    const cur = country.currency, priceK = price * FX[cur], shipK = ship * FX[cur], usd = (priceK + shipK) / FX.USD;
+    const cur = country.currency, priceK = price * FX[cur], shipK = ship * FX[cur];
+    // 면세 판정은 센트 단위로: 원화 왕복 나눗셈은 $190.05+$9.95 를 200.00000000000003 로 만들어 한도 초과로 읽는다 (GPT-6 Pro 2026-09-21)
+    const usd = cur === 'USD' ? Math.round((price + ship) * 100) / 100 : Math.round((priceK + shipK) / FX.USD * 100) / 100;
     const excluded = item.excluded;
     const limit = (country.courier200 && !excluded) ? R.exemption_usd_us_courier : R.exemption_usd;
     const under = usd <= limit;
-    const ftaOk = fta && country.fta && item.group !== 'tobacco';
+    const ftaOk = fta && country.fta && country.fta_zero !== false && item.group !== 'tobacco';
+    const ftaPartial = fta && country.fta && country.fta_zero === false && item.group !== 'tobacco'; // 협정국이지만 품목별 잔존 관세 — 0% 확정 불가
     const ict = R.consumption_tax;
     let lines = [], method = 'exempt', taxable = 0, exempt = under, partial = false;
     if (item.group === 'alcohol') {
-      const a = R.alcohol[item.alcohol]; taxable = priceK + shipK;
+      const a = R.alcohol[item.alcohol]; taxable = priceK + shipK + fwd;
       const duty = (under || ftaOk) ? 0 : taxable * a.duty, liquor = (taxable + duty) * a.liquor, edu = liquor * a.edu, vat = under ? 0 : (taxable + duty + liquor + edu) * R.vat;
       lines = [[`관세<span class="pill">${(under||ftaOk) ? '면제' : Math.round(a.duty*100)+'%'}</span>`, duty], [`주세<span class="pill">${Math.round(a.liquor*100)}%</span>`, liquor], [`교육세<span class="pill">주세의 ${Math.round(a.edu*100)}%</span>`, edu], [`부가세<span class="pill">${under ? '면제' : '10%'}</span>`, vat]]; method = under ? 'alcohol_partial' : 'alcohol'; exempt = false; partial = under;
     } else if (under) { method = 'exempt'; }
     else if (item.group === 'tobacco') { method = 'unsupported'; }
     else {
-      taxable = priceK + shipK;
+      taxable = priceK + shipK + fwd; // 과세가격 = 물품가 + 현지 배송비 + 국제운송비(배대지 배송비) — 관세법 제30조 (GPT-6 Pro 2026-09-21)
       const useSimp = simplified && item.duty > 0 && !ftaOk && taxable <= R.simplified_cap_krw;
       if (useSimp) {
         const lux = Object.entries(R.luxury).filter(([k]) => !k.startsWith('_')).map(([, v]) => v).find(v => v.items.includes(item.slug));
@@ -67,14 +70,14 @@
       } else {
         const duty = (ftaOk || item.duty === 0) ? 0 : taxable * item.duty;
         const vatRate = (R.vat_exempt_items || []).includes(item.slug) ? 0 : R.vat;
-        lines = [[`관세<span class="pill">${ftaOk ? 'FTA 0%' : Math.round(item.duty * 1000) / 10 + '%'}</span>`, duty]];
+        lines = [[`관세<span class="pill">${ftaOk ? 'FTA 0%' : Math.round(item.duty * 1000) / 10 + '%' + (ftaPartial && item.duty > 0 ? ' · FTA 세율 확인 필요' : '')}</span>`, duty]];
         let excise = 0, edu = 0; const thr = ict.thresholds_krw[item.slug];
         if (thr && taxable + duty > thr) { excise = (taxable + duty - thr) * ict.rate; edu = excise * ict.edu; lines.push(['개별소비세<span class="pill">초과분 20%</span>', excise], ['교육세<span class="pill">개소세의 30%</span>', edu]); }
         lines.push([`부가세<span class="pill">${Math.round(vatRate * 100)}%</span>`, (taxable + duty + excise + edu) * vatRate]); method = 'general';
       }
     }
     const tax = lines.reduce((s, [, v]) => s + v, 0);
-    return { exempt, partial, limit, usd, priceK, shipK, taxable, lines, tax, total: priceK + shipK + tax + fwd, method, ftaOk: ftaOk && !under, eff: (priceK + shipK) ? tax / (priceK + shipK) * 100 : 0 };
+    return { exempt, partial, limit, usd, priceK, shipK, fwd, taxable, lines, tax, total: priceK + shipK + tax + fwd, method, ftaOk: ftaOk && !under, ftaPartial: ftaPartial && !under && method === 'general' && item.duty > 0, eff: (priceK + shipK) ? tax / (priceK + shipK) * 100 : 0 };
   }
 
 
@@ -135,7 +138,7 @@
     else {
       title = `세금 ${won(r.tax)} (${r.eff.toFixed(1)}%) · ${item.excluded ? '일반통관' : '목록통관 한도 초과'}`;
       const over = r.usd - r.limit;
-      text = `물품가+현지 배송비 미화 ${r.usd.toFixed(0)}달러로 한도 ${r.limit}달러를 ${over.toFixed(0)}달러 넘어 전체가 과세됩니다. 과세가격 ${won(r.taxable)}${r.ftaOk ? ' · FTA 적용으로 관세 0%' : ''}.`;
+      text = `물품가+현지 배송비 미화 ${r.usd.toFixed(0)}달러로 한도 ${r.limit}달러를 ${over.toFixed(0)}달러 넘어 전체가 과세됩니다. 과세가격 ${won(r.taxable)}${fwd ? ' (배대지 배송비 포함)' : ''}${r.ftaOk ? ' · FTA 적용으로 관세 0%' : ''}.${r.ftaPartial ? ` ${country.fta_name}는 품목별 잔존 관세가 있어 0%로 계산하지 않았습니다 — 관세율표의 협정세율을 확인하세요.` : ''}`;
     }
     const rows = r.lines.map(([n, v]) => `<tr><th>${n}</th><td>${won(v)}</td></tr>`).join('');
     let nearLimit = '';
@@ -145,7 +148,7 @@
       nearLimit = `<p class="sheet-text tip">한도를 ${(r.usd - r.limit).toFixed(0)}달러만 넘었습니다. 물품가를 ${country.symbol}${under.toLocaleString('ko-KR')} 아래로 맞추면 ${item.group === 'alcohol' ? `관세·부가세 ${won(saved)}이 빠집니다(주세·교육세는 남음)` : `세금 ${won(saved)}이 사라집니다`}.</p>`;
     }
     const actions = `<p class="sheet-actions"><a class="next" href="${base}items/${item.slug}/from/${country.slug}/">${country.name}에서 ${item.name} 직구 가이드</a><a class="next" href="https://www.coupang.com/np/search?q=${encodeURIComponent(item.name)}" rel="nofollow noopener" target="_blank">쿠팡 국내가와 비교</a></p>`;
-    out.innerHTML = `<section class="sheet ${cls}"><p class="sheet-label">예상 결제 총액</p><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>현지 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지·국내 배송</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
+    out.innerHTML = `<section class="sheet ${cls}"><p class="sheet-label">예상 결제 총액</p><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>현지 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지 배송비</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
     document.querySelectorAll('.sheet-num .num').forEach(countUp);
     if (first) riseIn();
     if (scroll === true) bringIntoView(out);

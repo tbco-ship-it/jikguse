@@ -7,6 +7,7 @@ Two sources for the same 관세청 weekly rate (applies Sunday–Saturday):
 - UNIPASS 주간환율조회 (no auth) — fallback; refuses non-Korean IPs.
 """
 import datetime as dt
+from zoneinfo import ZoneInfo
 import json
 import os
 import re
@@ -55,7 +56,7 @@ def fetch_unipass(today: dt.date, start: dt.date, end: dt.date):
 
 
 def main():
-    today = dt.date.today()
+    today = dt.datetime.now(ZoneInfo("Asia/Seoul")).date()  # the Sunday 07:30 KST cron runs at Saturday 22:30 UTC — date.today() there picks last week
     start, end = week_bounds(today)
     key = os.environ.get("DATAGO_FX_KEY")
     if key:

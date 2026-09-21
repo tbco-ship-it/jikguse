@@ -99,4 +99,11 @@ t('forecast: base falls back to another window when d30 is unknown', () => {
   assert.equal(f.base, 'd7'); assert.equal(f.rate, 3); assert.equal(f.by.d7.days, 10);
 });
 
+t('발주 수량: 리드+커버 창 밖에 도착하는 물량은 빼지 않는다 (GPT-6 Pro 2026-09-21)', () => {
+  const f = S.forecast({ today: '2026-09-21', avail: 300, inbound: 0, rates: { d30: 10 }, lead: 25, cover: 30, buffer: 0, arrivals: [{ date: '2027-01-01', qty: 1000 }] });
+  assert.equal(f.qty, 250); assert.equal(f.arriving, 0); assert.equal(f.arrivingLater, 1000); assert.equal(f.main.date, '2026-10-21');
+  const g = S.forecast({ today: '2026-09-21', avail: 300, inbound: 0, rates: { d30: 10 }, lead: 25, cover: 30, buffer: 0, arrivals: [{ date: '2026-10-15', qty: 100 }] });
+  assert.equal(g.qty, 150); assert.equal(g.arriving, 100);
+});
+
 console.log(`\n${n} tests passed`);

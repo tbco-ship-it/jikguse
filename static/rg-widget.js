@@ -115,9 +115,9 @@
 </div>`;
 
   const numv = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
-  const modelArgs = (I, cat, table, dims, wt, price, cost, n) => {
+  const modelArgs = (fees, I, cat, table, dims, wt, price, cost, n) => {
     const RgCalc = root.RgCalc, tier = RgCalc.sizeTier(dims, wt), cbm = dims[0] * dims[1] * dims[2] / 1e9;
-    return { ...I, table, rate: cat.r, sizeIdx: tier.i, extra: tier.extra, cbm, apparel: RgCalc.isApparel(cat.p), price, cost, tier, n };
+    return { ...I, table, rate: cat.r, sizeIdx: tier.i, extra: tier.extra, cbm, apparel: RgCalc.isApparel(cat.p), price, cost, tier, n, promoOver: RgCalc.promoOver(fees) };
   };
   const TRACKED = ['monthly', 'ret', 'disc']; // fields whose writer matters (SRC)
   // Saved-slot migration, one path for the widget (applyState) and the 사업자 합계 (evaluate on a raw slot) so both see the same numbers:
@@ -144,7 +144,7 @@
       inbound: numv(s.inbound), saver: !!s.saver, simplified: !!s.simp, cat, sizeMode, tierIdx };
     const needs = { cat: !cat, price: !I.price, size: !tier };
     if (needs.cat || needs.price || needs.size) return { ok: false, needs, I };
-    const A = modelArgs(I, cat, FEES.units[cat.u], dims, wt, I.price, I.cost, 1);
+    const A = modelArgs(FEES, I, cat, FEES.units[cat.u], dims, wt, I.price, I.cost, 1);
     return { ok: true, needs, I, A, c: RgCalc.compute(A) };
   }
 
@@ -281,7 +281,10 @@
         if (SRC.avail !== 'user' && W.stock.avail != null) { PF.avail.value = String(W.stock.avail); SRC.avail = 'wing'; }
         if (SRC.inbound !== 'user' && W.stock.inbound != null) { PF.inbound.value = String(W.stock.inbound); SRC.inbound = 'wing'; }
       }
-      if (!wingIsThis() && wingPriceMatch() !== 'same') return;
+      // a 북마클릿 item is this product, but its 30-day volume happened at the Wing price: once the seller types a different 판매가 the
+      // numbers are an offer ([위 칸에 넣기]), not an auto-fill (GPT-6 Pro 2026-09-21). A paste needs the exact price match.
+      const match = wingPriceMatch();
+      if (wingIsThis() ? match === 'off' : match !== 'same') return;
       applyWing({ monthly: SRC.monthly !== 'user', ret: SRC.ret !== 'user' });
     }
     function applyWing(which) {
@@ -359,7 +362,7 @@
       for (const f of FIELDS) s[f] = F[f].value;
       return s;
     }
-    const args = (I, dims, wt, price, cost, n) => modelArgs(I, cat, unitOf(cat), dims, wt, price, cost, n);
+    const args = (I, dims, wt, price, cost, n) => modelArgs(FEES, I, cat, unitOf(cat), dims, wt, price, cost, n);
     function bandLabel(bands, price) {
       const i = RgCalc.band(bands, price);
       const lo = bands[i], hi = bands[i + 1];
@@ -412,7 +415,7 @@
       const tone = c.expected <= 0 ? 'severe' : c.margin < 0.1 ? 'moderate' : 'balanced';
       const retLine = c.returns.r > 0 ? `반품 ${pct1(c.returns.r)} 반영: 반품 1건당 ${won(c.returns.perReturn)}(회수 ${won(c.returns.pickup)} + 재입고 ${won((1 - c.returns.q) * c.returns.restock)} + 재판매 불가 ${pct1(c.returns.q)}분 원가·반출비 ${won(c.returns.cogsLoss + c.returns.removal)})${c.billable < 1 && !I.saver ? ` · 월 20건 무료라 ${pct1(1 - c.billable)}는 무료` : ''}${I.saver ? ' · 세이버로 회수·재입고비 0' : ''}` : '반품률 0% — 반품 비용 없음';
       const rows = [
-        ['매출 (공급가)', c.revenue, `${I.sellerDisc > 0 ? `판매가 ${won(I.price)} − 즉시할인 ${I.sellerDisc}% = ${won(c.sold)}` : `판매가 ${won(c.sold)}`}${I.simplified ? ' − 간이과세 부가세 약 1%' : ' ÷ 1.1'}`],
+        ['매출 (공급가)', c.revenue, `${I.sellerDisc > 0 ? `판매가 ${won(I.price)} − 즉시할인 ${I.sellerDisc}% = ${won(c.sold)}` : `판매가 ${won(c.sold)}`}${I.simplified ? ' − 간이과세 납부세액 1.5% (소매 부가가치율 15%)' : ' ÷ 1.1'}`],
         ['판매수수료', -c.commission, `${cat.r}% × ${won(c.sold)}`],
         ['입출고비', -c.wh, `${I.tier.name} · ${bandLabel(unitOf(cat).bands, c.sold)}${I.tier.extra ? ' + 추가 ' + won(I.tier.extra) : ''}`],
         ['배송비', -c.sh, '주문당 1회'],
@@ -420,7 +423,7 @@
         ...(c.ad ? [['광고비', -c.ad, `매출의 ${I.adPct}%`]] : []),
         ...(c.inbound ? [['입고 운송비 등', -c.inbound, '개당, VAT 별도']] : []),
         ...(c.saverShare ? [['세이버 이용료 안분', -c.saverShare, `99,000원 ÷ 월 ${I.monthly}개`]] : []),
-        ['매입원가', -c.cost, ctx.cost != null ? '수입 계산기 개당 원가 (관세·운임 안분, VAT 제외)' : 'VAT 제외'],
+        ['매입원가', -c.cost, I.simplified ? `VAT 제외 ${won(c.costNet)} × 1.1 − 세금계산서 공제 0.5% — 간이과세자는 매입(수입) 부가세를 못 돌려받아요` : ctx.cost != null ? '수입 계산기 개당 원가 (관세·운임 안분, VAT 제외)' : 'VAT 제외'],
       ];
       const tbl = rows.map(([k, v, note]) => `<tr><th>${esc(k)}<small>${esc(note)}</small></th><td class="${v < 0 ? 'neg' : ''}">${v < 0 ? '−' : ''}${won(Math.abs(v))}</td></tr>`).join('');
       // 반품으로 매출이 빠지는 만큼 (1−r) 가중 — 표에는 항목별 금액, 합계는 기대값
@@ -445,7 +448,7 @@
         <div class="tbl-wrap"><table class="tbl spec biz bundle"><thead><tr><th>구성</th><th>판매가</th><th>개당 물류비</th><th>개당 순이익</th><th>손익분기</th></tr></thead><tbody>${bRows}</tbody></table></div>
         <p class="sheet-text tip">정산: 월정산은 월 마감 + 20영업일에 100%, 주정산은 주 마감 + 20영업일에 70% · 익익월 첫 영업일에 30%. 판매수수료·입출고·배송비는 정산에서 차감되고 VAT 세금계산서가 따로 발행됩니다.</p>
         <p class="sheet-actions"><button type="button" class="next rg-copy">결과 텍스트 복사</button></p>
-        <p class="muted small basis">요금: 쿠팡 판매자센터 로켓그로스 비용/수수료 ${FEES.asof} (프로모션 ${FEES.promo_until}까지) · 반품률은 쿠팡이 공개하지 않아 카테고리 기본값(추정)이며 윙 &gt; 로켓그로스 &gt; 반품분석의 내 수치를 넣는 것이 정확합니다 · 재입고비는 기본 단가(2025-07 프로모션 종료 후 카테고리별 할인 미반영). 예상치이며 실제 청구는 윙 정산현황 기준입니다. 오류 제보: hello@jikguse.com</p></section>`;
+        <p class="muted small basis">요금: 쿠팡 판매자센터 로켓그로스 비용/수수료 ${FEES.asof} ${c.promoOver ? `· <strong>프로모션 요금이 ${FEES.promo_until}에 끝나 기본 단가표(입출고·배송)로 계산 중입니다 — 쿠팡이 새 프로모션을 공지했으면 hello@jikguse.com 으로 알려 주세요</strong>` : `(프로모션 ${FEES.promo_until}까지)`} · 반품률은 쿠팡이 공개하지 않아 카테고리 기본값(추정)이며 윙 &gt; 로켓그로스 &gt; 반품분석의 내 수치를 넣는 것이 정확합니다 · 재입고비는 기본 단가(2025-07 프로모션 종료 후 카테고리별 할인 미반영). 예상치이며 실제 청구는 윙 정산현황 기준입니다. 오류 제보: hello@jikguse.com</p></section>`;
       out.querySelectorAll('.bp').forEach(el => el.addEventListener('change', e => { BP[+el.dataset.n] = parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0; render(); }));
       const copy = out.querySelector('.rg-copy');
       copy.addEventListener('click', () => {
@@ -521,7 +524,7 @@
         rows.push(['쿠팡 예상 비용 (개당)', won(W.cost.unit), mine == null ? `${!ev.ok ? '카테고리·판매가·사이즈 유형을 넣으면 계산기 비용과 대조합니다' : match === 'off' ? `쿠팡은 최종구매가 ${won(fin)} 기준으로 이 값을 냅니다 — 판매가 칸에 ${won(fin)}을 넣으면 수수료율·사이즈 유형을 대조해 드려요` : '윙 화면의 판매가를 못 읽어 대조하지 않습니다'}${storageNote}`
           : `이 계산기의 판매수수료 + 입출고비 + 배송비 (판매가 ${won(basis)} 기준) ${won(mine)} → 차이 ${signPct((mine - W.cost.unit) / W.cost.unit)}${
             fix ? ` — 지금 요금표에서는 수수료 ${fix.rate}% × ${won(basis)} + ${RgCalc.SIZES[fix.tierIdx].name} 입출고·배송비가 원 단위까지 맞아요${tierOff || rateOff ? `. 지금은 ${nowLabel}${rateOff && !fixCat ? ` — 위 카테고리 칸에서 수수료 ${fix.rate}% 카테고리를 골라 주세요` : ''}` : ' · 카테고리(수수료율)·사이즈 유형이 쿠팡 비용과 맞아요'}`
-            : tierOff && !catOff ? ` — 쿠팡 비용은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})과 맞는데 지금은 ${I.tier.name}으로 되어 있어요` : tierOff ? ` — 가장 가까운 유형은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})이지만 그래도 ${signPct(inf.gap)} 차이. 지금은 ${I.tier.name}이고, 카테고리(수수료율)도 실제 등록과 다른지 확인하세요` : catOff ? ' — 어느 사이즈 유형으로도 안 맞아요. 카테고리(수수료율)가 실제 등록과 다른지 확인하세요' : ' — 카테고리(수수료율)·사이즈 유형이 쿠팡 비용과 맞아요'}${storageNote}`]);
+            : tierOff && !catOff ? ` — 쿠팡 비용은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})과 맞는데 지금은 ${I.tier.name}으로 되어 있어요` : tierOff ? ` — 가장 가까운 유형은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})이지만 그래도 ${signPct(inf.gap)} 차이. 지금은 ${I.tier.name}이고, 카테고리(수수료율)도 실제 등록과 다른지 확인하세요` : catOff ? ' — 어느 사이즈 유형으로도 안 맞아요. 카테고리(수수료율)가 실제 등록과 다른지 확인하세요' : ` — 원 단위까지 맞는 조합은 못 찾았지만 ${inf ? RgCalc.SIZES[inf.i].name : I.tier.name} 기준 ${signPct(inf ? inf.gap : (mine - W.cost.unit) / W.cost.unit)} 차이라 대체로 맞는 설정이에요`}${storageNote}`]);
       }
       const tbl = rows.map(([k, v, note]) => `<tr><th>${esc(k)}<small>${esc(note)}</small></th><td>${esc(v)}</td></tr>`).join('');
       // 머리 숫자 = 지금 입력 그대로 (월 판매량 칸 × 개당). 쿠팡 비용과 맞는 다른 설정, 윙 판매량, 7일 속도는 전부 "미적용 미리보기"로 따로.
@@ -582,7 +585,9 @@
       const { rates, v, src } = planRates();
       const avail = numv(PF.avail.value), inbound = numv(PF.inbound.value);
       const prog = myOrders().map(x => ({ o: x, e: RgStock.eta(x, st, today) })).filter(x => x.e.stage && !x.e.done && numv(x.o.qty) > 0);
-      const arrivals = prog.map(x => ({ date: x.e.eta, qty: numv(x.o.qty) }));
+      // an order already at 입고 요청 is what Wing reports as 입고중 — when Wing gave an 입고중 count, those orders are not added again (GPT-6 Pro 2026-09-21)
+      const dupReq = inbound > 0 ? prog.filter(x => x.e.stage.k === 'req') : [];
+      const arrivals = prog.filter(x => !dupReq.includes(x)).map(x => ({ date: x.e.eta, qty: numv(x.o.qty) }));
       const cover = numv(LEAD.cover), buffer = numv(LEAD.buffer);
       const f = RgStock.forecast({ today, avail, inbound, rates, lead, cover, buffer, arrivals });
       const perUnit = ev.ok ? ev.c.expected : null;
@@ -608,7 +613,7 @@
       const qtyLine = f.qty == null ? '' : f.qty > 0 ? `<p class="sheet-text">필요 수량 <strong>${cnt(f.qty)}</strong> = 하루 ${n1(f.rate)}개 × (리드타임 ${lead} + 커버 ${cover})일 ${cnt(need)} − ${cnt(f.stock0)}${f.arriving ? ` − 들어올 ${cnt(f.arriving)}` : ''}${perUnit != null ? ` · 지금 설정의 개당 순이익으로 ${signed(f.qty * perUnit)}` : ''}${W && W.stock && W.stock.recommend != null ? ` · 쿠팡 입고권장 ${cnt(W.stock.recommend)}` : ''}</p>`
         : `<p class="sheet-text">지금은 발주 수량 <strong>없음</strong> — 리드타임 ${lead} + 커버 ${cover}일치(${cnt(need)})보다 재고${f.arriving ? '와 들어올 수량' : ''}가 많아요. 발주 마감일에 다시 보세요.</p>`;
       const pending = myOrders().map(x => ({ o: x, e: RgStock.eta(x, st, today) })).filter(x => x.e.stage && !x.e.done);
-      const progHtml = pending.length ? `<p class="sheet-text">진행 중 주문: ${pending.map(x => `${numv(x.o.qty) > 0 ? cnt(numv(x.o.qty)) : '수량 미입력(예측에 못 넣음)'} — ${x.e.stage.label} ${fmtD(x.o.dates[x.e.stage.k])} → 예상 입고 ${fmtD(x.e.eta)}${x.e.late ? ' (예정일 지남, 오늘로 잡음)' : ''}`).join(' · ')}</p>` : '';
+      const progHtml = pending.length ? `<p class="sheet-text">진행 중 주문: ${pending.map(x => `${numv(x.o.qty) > 0 ? cnt(numv(x.o.qty)) : '수량 미입력(예측에 못 넣음)'} — ${x.e.stage.label} ${fmtD(x.o.dates[x.e.stage.k])} → 예상 입고 ${fmtD(x.e.eta)}${x.e.late ? ' (예정일 지남, 오늘로 잡음 — 확인 필요)' : ''}${dupReq.includes(x) ? ' · 윙 입고중에 이미 포함된 물량으로 보고 따로 더하지 않음' : ''}`).join(' · ')}</p>` : '';
       const vt = v ? `<div class="tbl-wrap"><table class="tbl mini rg"><thead><tr><th>기간</th><th>판매</th><th>하루</th></tr></thead><tbody>${['d7', 'd30', 'd90'].map(k => `<tr class="${k === f.base ? 'on' : ''}"><th>${rateName[k]}<small>${v[k].days < { d7: 7, d30: 30, d90: 90 }[k] ? `${v[k].days}일치만 있음` : `${v[k].days}일`}</small></th><td>${cnt(v[k].units)}</td><td>${v[k].rate != null ? n1(v[k].rate) + '개' : '—'}</td></tr>`).join('')}</tbody></table></div>` : '';
       let chart = '';
       if (v) {
@@ -618,7 +623,7 @@
       const empties = empty && SRC.avail !== 'user' ? `<p class="sheet-text">재고 칸이 비어 있어 0개로 계산했어요 — 위 현재 재고 칸에 판매가능 수량을 적어 주세요.</p>` : '';
       planOut.innerHTML = `<section class="sheet ${tone}"><p class="sheet-label">${ctx.name || (W && W.name) ? esc((ctx.name || W.name)) + ' · ' : ''}품절 예측</p>${head}${empties}${qtyLine}${progHtml}${chart}${vt}
         <p class="sheet-actions"><button type="button" class="next alt rg-plan-add">${f.qty > 0 ? `${cnt(f.qty)} 주문 기록 추가` : '주문 기록 추가'} (오늘 1688 주문)</button></p>
-        <p class="muted small basis">속도: ${srcLine}. 예측은 ${rateName[f.base] || '가능한'} 속도가 이어진다는 가정이고, 7·30·90일 속도의 품절일이 7일 넘게 벌어지면 범위로 적습니다. 입고중과 진행 중 주문은 예상 입고일에 재고로 더합니다. 발주 마감 = 품절일 − 리드타임 − 여유. 필요 수량 = 속도 × (리드타임 + 커버) − 지금 재고 − 들어올 수량.</p></section>`;
+        <p class="muted small basis">속도: ${srcLine}. 예측은 ${rateName[f.base] || '가능한'} 속도가 이어진다는 가정이고, 7·30·90일 속도의 품절일이 7일 넘게 벌어지면 범위로 적습니다. 입고중과 진행 중 주문은 예상 입고일에 재고로 더합니다. 발주 마감 = 품절일 − 리드타임 − 여유. 필요 수량 = 속도 × (리드타임 + 커버) − 지금 재고 − 그 기간 안에 들어올 수량(그 뒤 도착분은 안 뺌).</p></section>`;
       const ab = planOut.querySelector('.rg-plan-add');
       if (ab) ab.addEventListener('click', () => addOrder({ qty: f.qty > 0 ? f.qty : null }));
     }

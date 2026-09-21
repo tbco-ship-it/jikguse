@@ -53,8 +53,14 @@
     return { dims: [side, side, side], wt: Math.round((lo.kg + hi.kg) / 2 * 1000) };
   }
 
-  // fee table lookup: t = { bands:[...], wh:[6][n], sh:[6][n], base_wh:[6], base_sh:[6] }
-  const lookup = (t, kind, sizeIdx, price) => t[kind][sizeIdx][band(t.bands, price)];
+  // fee table lookup: t = { bands:[...], wh:[6][n], sh:[6][n], base_wh:[6], base_sh:[6] }. base = the flat non-promotional 단가
+  // (used once the promotion window in the fee file has passed — the promo grid must not outlive its own end date, GPT-6 Pro 2026-09-21)
+  const lookup = (t, kind, sizeIdx, price, base) => base ? t['base_' + kind][sizeIdx] : t[kind][sizeIdx][band(t.bands, price)];
+  // fees file says 'promo_until: YYYY-MM-DD'; after that day the promo grid is stale. asOf = 'YYYY-MM-DD' (today by default).
+  const promoOver = (fees, asOf) => !!(fees && fees.promo_until) && (asOf || new Date().toISOString().slice(0, 10)) > fees.promo_until;
+  // 간이과세자 (소매·통신판매 부가가치율 15%, 부가가치세법 시행령 제111조): 납부세액 = 공급대가 × 1.5%, 세금계산서 매입액 × 0.5% 공제.
+  // 매입 부가세(수입 부가세 포함)는 공제가 안 되니 현금 원가·비용은 VAT 포함 금액이다.
+  const SIMP = { rate: 0.015, credit: 0.005 };
 
   // 기대 보관비(원/개): 부피 cbm, 무료 free일, 판매기간 T일(균등 판매). 일별 금액은 옵션 단위로 반올림(0.4원까지 0).
   function storageCost(cbm, free, T) {
@@ -78,8 +84,8 @@
     const sold = P * (1 - (Number(x.sellerDisc) || 0) / 100);  // 판매자 할인 반영 소비자 판매가 = 수수료·정산 기준
     const feeBase = sold;                                       // 입출고/배송 구간도 판매가 기준
     const commission = sold * (Number(x.rate) || 0) / 100;
-    const wh = lookup(x.table, 'wh', x.sizeIdx, feeBase) + (x.extra || 0);
-    const sh = lookup(x.table, 'sh', x.sizeIdx, feeBase);
+    const wh = lookup(x.table, 'wh', x.sizeIdx, feeBase, x.promoOver) + (x.extra || 0);
+    const sh = lookup(x.table, 'sh', x.sizeIdx, feeBase, x.promoOver);
     const free = x.saver ? 60 : (x.apparel ? 45 : 30);
     const storage = storageCost(x.cbm || 0, free, x.turnover);
     const ad = sold * (Number(x.adPct) || 0) / 100;
@@ -91,22 +97,28 @@
     else if (monthly > 0 && r > 0) billable = Math.max(0, monthly * r - FREE_RETURNS) / (monthly * r);
     const pickup = (x.apparel ? RETURN_PICKUP.apparel : RETURN_PICKUP.general)[x.sizeIdx] * billable;
     const restock = RESTOCK.base[band(RESTOCK.bands, sold)] * billable; // 25-07-01 재입고 프로모션 종료 → 기본 단가로 보수적 계산
-    const cost = Math.max(0, Number(x.cost) || 0);
+    const costNet = Math.max(0, Number(x.cost) || 0); // 매입원가, VAT 제외 (수입이면 과세가격 + 관세)
+    // 일반과세자: 매출 공급가 = 판매가/1.1, 비용·원가는 VAT 별도 금액 그대로 (매입세액은 전액 공제).
+    // 간이과세자: 매출에서 공급대가×1.5% 를 내고, 비용·원가는 VAT 포함 현금(×1.1)에서 세금계산서분 0.5% 만 돌려받는다 (GPT-6 Pro 2026-09-21).
+    const revenue = x.simplified ? sold * (1 - SIMP.rate) : sold / 1.1;
+    const feeMul = x.simplified ? 1.1 * (1 - SIMP.credit) : 1;
+    const cost = x.simplified ? costNet * feeMul : costNet; // 현금 원가: 간이과세자는 수입 부가세를 못 돌려받는다
     const perReturn = pickup + (1 - q) * restock + q * (cost + REMOVAL); // 재판매 불가분: 원가 손실 + 반출비
-    // 일반과세자: 매출 공급가 = 판매가/1.1, 비용은 VAT 별도 금액 그대로. 간이과세자: 매출 ≈ 판매가×0.99, 비용은 VAT 포함(×1.1).
-    const revenue = x.simplified ? sold * 0.99 : sold / 1.1;
-    const feeMul = x.simplified ? 1.1 : 1;
     const fees = (commission + wh + sh + storage + ad + inbound) * feeMul;
     const saverShare = x.saver && monthly > 0 ? SAVER * feeMul / monthly : 0;
     const keptProfit = revenue - fees - cost - saverShare;
     const expected = (1 - r) * keptProfit - r * ((perReturn + storage + inbound) * feeMul + saverShare); // 반품 건도 보관·입고비·세이버는 든다
     const perSold = (1 - r) > 0 ? expected / (1 - r) : 0; // 실제 판매(유지) 1건당
+    // 재고 1개를 실제로 소진하는 데 드는 판매 시도 수: 반품 중 재판매분은 재고로 돌아온다 → 1 / (1 − r·(1−q)) (GPT-6 Pro 2026-09-21)
+    const attempts = 1 / Math.max(0.05, 1 - r * (1 - q));
     return {
-      price: P, sold, revenue, commission, wh, sh, storage, ad, inbound, saverShare, cost, free, billable,
+      price: P, sold, revenue, commission, wh, sh, storage, ad, inbound, saverShare, cost, costNet, free, billable, attempts,
+      perStock: expected * attempts, // 재고 1개를 다 팔 때까지의 기대 순이익 ("전부 팔면" = perStock × 수량)
       returns: { r, q, pickup, restock, perReturn, cogsLoss: q * cost, removal: q * REMOVAL },
       keptProfit, expected, perSold,
       margin: sold > 0 ? expected / sold : 0, roi: cost > 0 ? expected / cost : 0,
-      vatOut: x.simplified ? sold * 0.01 : sold / 11, vatIn: x.simplified ? 0 : (commission + wh + sh + storage + ad + inbound) * 0.1,
+      vatOut: x.simplified ? sold * SIMP.rate : sold / 11, vatIn: x.simplified ? (commission + wh + sh + storage + ad + inbound + costNet) * 1.1 * SIMP.credit : (commission + wh + sh + storage + ad + inbound) * 0.1,
+      promoOver: !!x.promoOver,
       monthly, monthlyProfit: monthly > 0 ? expected * monthly : 0, monthlyRevenue: monthly > 0 ? sold * monthly : 0
     };
   }
@@ -134,5 +146,5 @@
   }
   const isApparel = path => APPAREL_ROOTS.includes(String(path || '').split('>')[0]);
 
-  root.RgCalc = { SIZES, STORAGE_TIERS, RETURN_PICKUP, RESTOCK, REMOVAL, FREE_RETURNS, SAVER, RETURN_DEFAULTS, sizeTier, tierDims, lookup, storageCost, compute, breakEven, bundleDims, returnDefault, isApparel, band };
+  root.RgCalc = { SIZES, STORAGE_TIERS, RETURN_PICKUP, RESTOCK, REMOVAL, FREE_RETURNS, SAVER, RETURN_DEFAULTS, SIMP, sizeTier, tierDims, lookup, promoOver, storageCost, compute, breakEven, bundleDims, returnDefault, isApparel, band };
 })(typeof window !== 'undefined' ? window : globalThis);

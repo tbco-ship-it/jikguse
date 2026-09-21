@@ -31,8 +31,8 @@ def compute(item, country, price, shipping, fx, *, method=None, fta=False, couri
     excluded = item["excluded"]
     limit = RULES["exemption_usd_us_courier"] if (country["courier200"] and courier and not excluded) else RULES["exemption_usd"]
     clearance = "일반통관" if excluded else "목록통관"
-    exempt = threshold_usd <= limit
-    fta_ok = fta and country["fta"] and item["group"] != "tobacco"
+    exempt = round(threshold_usd, 2) <= limit  # 센트 단위 비교 (calc.js 와 동일)
+    fta_ok = fta and country["fta"] and country.get("fta_zero", True) and item["group"] != "tobacco"  # 한·중: 품목별 잔존 관세 → 0% 확정 안 함
     ict = RULES["consumption_tax"]
 
     lines = []
@@ -41,7 +41,7 @@ def compute(item, country, price, shipping, fx, *, method=None, fta=False, couri
     if item["group"] == "alcohol":
         # 관세청 조회기: "주류는 150달러 이하 면세이면 관세, 부가세만 면세이고, 주세, 교육세는 부과"
         a = RULES["alcohol"][item["alcohol"]]
-        taxable = price_krw + ship_krw
+        taxable = price_krw + ship_krw + forwarder_krw  # 과세가격 = 물품가 + 현지 배송비 + 국제운송비(배대지 배송비)
         duty = 0.0 if (exempt or fta_ok) else taxable * a["duty"]
         liquor = (taxable + duty) * a["liquor"]
         edu = liquor * a["edu"]
@@ -53,7 +53,7 @@ def compute(item, country, price, shipping, fx, *, method=None, fta=False, couri
     elif item["group"] == "tobacco":
         method_used = "unsupported"
     else:
-        taxable = price_krw + ship_krw
+        taxable = price_krw + ship_krw + forwarder_krw  # 과세가격 = 물품가 + 현지 배송비 + 국제운송비(배대지 배송비)
         use_simplified = (method == "simplified" and item["duty"] > 0 and not fta_ok and taxable <= RULES["simplified_cap_krw"])
         if use_simplified:
             lux = next((v for k, v in RULES["luxury"].items() if not k.startswith("_") and item["slug"] in v["items"]), None)
