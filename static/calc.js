@@ -18,12 +18,13 @@
     let items = [], active = -1, query = '';
     const remembered = params.get(input.dataset.kind === 'items' ? 'item' : 'from') || localStorage.getItem('jikguse.' + input.dataset.kind);
     choose(list.find(x => x.slug === remembered) || list.find(x => x.slug === initialSlug) || list[0], false);
-    function choose(x, fire = true) { picked[input.dataset.kind] = x; input.value = labelOf(x); localStorage.setItem('jikguse.' + input.dataset.kind, x.slug); close(); onPick && onPick(x, fire ? query : undefined); query = ''; if (fire) render(true); }
+    // onPick runs before the label is written so it can change what the label says (country picked via a shop name)
+    function choose(x, fire = true, typed) { picked[input.dataset.kind] = x; localStorage.setItem('jikguse.' + input.dataset.kind, x.slug); close(); onPick && onPick(x, fire ? (typed !== undefined ? typed : query) : undefined); input.value = labelOf(x); query = ''; if (fire) render(true); }
     function rank(x, q) { const t = searchOf(x).map(norm); if (t.includes(q)) return 0; if (t.some(k => k.startsWith(q))) return 1; return 2; }
     function open(q) {
       const nq = norm(q); query = q;
       items = (nq ? list.filter(x => searchOf(x).some(k => norm(k).includes(nq))).sort((a, b) => rank(a, nq) - rank(b, nq)) : list).slice(0, 8);
-      menu.innerHTML = items.length ? items.map((x, i) => `<li role="option" data-i="${i}" ${i === active ? 'aria-selected="true"' : ''}>${labelOf(x)}</li>`).join('') : '<li class="empty">없는 항목이에요. 비슷한 품목을 골라 주세요.</li>';
+      menu.innerHTML = items.length ? items.map((x, i) => `<li role="option" data-i="${i}" ${i === active ? 'aria-selected="true"' : ''}>${labelOf(x, q)}</li>`).join('') : '<li class="empty">없는 항목이에요. 비슷한 품목을 골라 주세요.</li>';
       menu.hidden = false; input.setAttribute('aria-expanded', 'true');
     }
     function close() { menu.hidden = true; active = -1; input.setAttribute('aria-expanded', 'false'); }
@@ -39,12 +40,28 @@
     });
     menu.addEventListener('mousedown', e => { const li = e.target.closest('li[data-i]'); if (li) { choose(items[+li.dataset.i]); e.preventDefault(); } });
     input.addEventListener('blur', () => setTimeout(() => { close(); const p = picked[input.dataset.kind]; if (p) input.value = labelOf(p); }, 120));
+    return { choose };
   }
+
+  // ----- shop → country -----
+  // "어디서 사나요" accepts a shop name too (알리 → 중국). The picked shop is shown in the field ("알리익스프레스 · 중국") and as a lit chip,
+  // and decides the default price currency. Aliases (쉐인, temu…) live in countries.json shop_aliases.
+  let shopPick = localStorage.getItem('jikguse.shop') || null;
+  function shopOf(country, typed) {
+    if (!typed) return null; const q = norm(typed), al = country.shop_aliases || {};
+    const hit = (country.shops || []).find(x => norm(x).includes(q)); if (hit) return hit;
+    const k = Object.keys(al).find(k => norm(k).includes(q)); return k ? al[k] : null;
+  }
+  const countryLabel = (c, q) => { const shop = q === undefined ? shopPick : shopOf(c, q); return shop ? `${shop} · ${c.name}` : c.name; };
+  const QUICK_SHOPS = [['알리익스프레스', 'cn'], ['테무', 'cn'], ['쉬인', 'cn'], ['아마존', 'us'], ['아이허브', 'us'], ['타오바오', 'cn'], ['아마존 재팬', 'jp']];
+  const shopChips = $('shops');
+  shopChips.innerHTML = QUICK_SHOPS.map(([shop, slug]) => `<button type="button" class="chip" data-shop="${shop}" data-slug="${slug}"><span>${shop}</span></button>`).join('');
+  function syncShopChips() { shopChips.querySelectorAll('.chip').forEach(b => b.classList.toggle('on', !!shopPick && b.dataset.shop === shopPick && picked.countries && picked.countries.slug === b.dataset.slug)); }
 
   // ----- price currency -----
   // The price field is in the country's currency by default, but people who paid in won (AliExpress·Temu·Shein show
   // won prices) shouldn't have to convert. Choices: country currency · USD · KRW. A manual pick sticks until the country changes.
-  const KRW_SHOPS = /알리|테무|쉬인|ali|temu|shein/i;
+  const KRW_SHOPS = /알리|테무|쉬인|쉐인|셰인|ali|temu|shein/i;
   const SYM = { USD: '$', KRW: '', JPY: '¥', CNY: '¥', EUR: '€', GBP: '£', HKD: 'HK$', AUD: 'A$' };
   const CUR_NAME = { USD: '달러', KRW: '원', JPY: '엔', CNY: '위안', EUR: '유로', GBP: '파운드', HKD: '홍콩달러', AUD: '호주달러' };
   const RATE = c => c === 'KRW' ? 1 : FX[c];
@@ -60,7 +77,7 @@
   }
   // Country pick: "알리/테무/쉬인" → default KRW; any other shop or the country itself → the country currency. Clears a manual pick from another country.
   function setCurDefault(country, typed) {
-    const def = KRW_SHOPS.test(typed || '') ? 'KRW' : country.currency;
+    const def = KRW_SHOPS.test(shopPick || typed || '') ? 'KRW' : country.currency;
     curOverride = { slug: country.slug, def };
     localStorage.setItem('jikguse.cur', JSON.stringify(curOverride));
   }
@@ -199,7 +216,12 @@
     if (scroll === true) bringIntoView(out);
   }
 
-  picker($('country'), D.countries, c => c.name, c => [c.name, c.currency, ...(c.shops || [])], 'us', (c, typed) => { if (typed !== undefined) setCurDefault(c, typed); render(); });
+  const countryPicker = picker($('country'), D.countries, countryLabel, c => [c.name, c.currency, ...(c.shops || []), ...Object.keys(c.shop_aliases || {})], 'us', (c, typed) => {
+    if (typed !== undefined) { shopPick = shopOf(c, typed); if (shopPick) localStorage.setItem('jikguse.shop', shopPick); else localStorage.removeItem('jikguse.shop'); setCurDefault(c, typed); }
+    else if (shopPick && !(c.shops || []).includes(shopPick)) { shopPick = null; localStorage.removeItem('jikguse.shop'); } // remembered shop from another country
+    syncShopChips(); render();
+  });
+  shopChips.addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; const c = D.countries.find(x => x.slug === b.dataset.slug); if (c) countryPicker.choose(c, true, b.dataset.shop); });
   picker($('item'), D.items, i => i.name, i => [i.name, ...(i.aliases || [])], 'clothing');
   $('price').addEventListener('input', () => { const c = picked.countries, hit = c && detectSymbol($('price').value, c); if (hit) { curOverride = { slug: c.slug, def: curOverride && curOverride.slug === c.slug ? curOverride.def : c.currency, cur: hit }; localStorage.setItem('jikguse.cur', JSON.stringify(curOverride)); } });
   ['price', 'ship', 'fwd'].forEach(id => { $(id).addEventListener('input', () => render(false)); $(id).addEventListener('change', () => { if (num($('price'))) render(true); }); });

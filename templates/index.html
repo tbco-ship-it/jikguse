@@ -16,12 +16,13 @@
 <div class="calc card" id="calc">
   <h2 class="card-title">구매 정보를 알려주세요</h2>
   <div class="row">
-    <label class="field">어디서 사나요
+    <label class="field"><span>어디서 사나요 <small class="muted">(나라·쇼핑몰)</small></span>
       <input id="country" class="pick" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" autocomplete="off" placeholder="미국, 일본, 알리…" data-kind="countries"><ul class="menu" id="country-menu" role="listbox" hidden></ul>
     </label>
     <label class="field">무엇을 사나요
       <input id="item" class="pick" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" autocomplete="off" placeholder="위스키, 신발, 아이패드…" data-kind="items"><ul class="menu" id="item-menu" role="listbox" hidden></ul>
     </label>
+    <div class="chips shop-chips" id="shops" role="group" aria-label="쇼핑몰로 고르기"></div>
   </div>
   <div class="row">
     <label class="field">물품 가격
