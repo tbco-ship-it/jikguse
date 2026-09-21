@@ -120,6 +120,13 @@ new Function(readFileSync(join(ROOT, 'static/rg-widget.js'), 'utf8'))();
     assert.equal(globalThis.RgWidget.evaluate(FEES, slot, { cost: 835.4 }).c.cost, 835);
     assert.equal(globalThis.RgWidget.evaluate(FEES, null).ok, false);
   });
+  t('evaluate: a discount the seller never typed (pre-src save with Wing text) is dropped on the 합계 path too; a typed one stays', () => {
+    const legacy = { ...slot, disc: '42.5', wing: { text: 'x' } };                         // 2026-09-20 auto-fill leftover
+    assert.equal(globalThis.RgWidget.evaluate(FEES, legacy).c.sold, 19900);
+    assert.equal(globalThis.RgWidget.evaluate(FEES, { ...legacy, discTouched: true }).c.sold, 19900 * 0.575);
+    assert.equal(globalThis.RgWidget.evaluate(FEES, { ...legacy, src: { disc: 'user' } }).c.sold, 19900 * 0.575);
+    assert.equal(globalThis.RgWidget.evaluate(FEES, { ...slot, disc: '10' }).c.sold, 19900 * 0.9); // no Wing text → nothing to migrate
+  });
   t('evaluate: pre-toggle save (dims only, no sizeMode) is read as dims mode', () => {
     const ev = globalThis.RgWidget.evaluate(FEES, { ...slot, sizeMode: undefined, tierIdx: undefined, d1: '400', d2: '300', d3: '150', wt: '3000' });
     assert.ok(ev.ok); assert.equal(ev.I.tier.name, '소형');

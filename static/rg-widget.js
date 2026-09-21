@@ -8,9 +8,13 @@
 //   load(key, { cost, name, note, query, hs }) switches the saved-state slot (localStorage key) and, when given, sets the unit cost;
 //   query (the 품명 typed on the forwarder sheet) + hs (its HS code, chapter → likely 1차 카테고리) pick a Coupang category
 //   automatically when the slot has none saved.
-// 윙 실적 진단 (rg-wing.js): the 상품 관리 row pasted from Wing fills 월 판매량·반품률 with measured values, checks the picked
-// 사이즈 유형·카테고리 against 쿠팡 예상 비용(개당) and prints 판매 속도·재고 소진·다음 수입 발주 수량. Wing's 매출 is 단품 × 표시가,
-// so no real selling price is derived from it (2026-09-21: the old 실판매가 row invented a 42.5% discount on a bundled product).
+// 윙 실적 진단 (rg-wing.js): the 상품 관리 row pasted from Wing is an observation, not an input. It checks the picked 사이즈 유형·
+// 카테고리 against 쿠팡 예상 비용(개당) and prints 판매 속도·재고 소진·다음 수입 발주 수량. Its measured 월 판매량·반품률 land in the
+// form only where the seller never typed (SRC tracks who wrote each of 월 판매량·반품률·할인: 'user' | 'wing' | default) and only
+// when the pasted screen prices this product (판매가 칸 == 최종구매가); otherwise they are offered with an explicit apply button.
+// 판매가·할인 are never written by the program (owner 2026-09-21). Wing's 매출 is 단품 × 표시가, so no real selling price is derived
+// from it (the old 실판매가 row invented a 42.5% discount on a bundled product). The headline is always the seller's own settings;
+// a 유형·카테고리 that matches 쿠팡 비용 is a preview until '바꾸기' commits the same patch. (GPT-6 Pro review 2026-09-21.)
 // Size: the seller picks a 쿠팡 사이즈 유형 (극소형~특대형) by default — few people know their packed dimensions — and the tier's
 // representative dims (RgCalc.tierDims) stand in for storage volume and bundle sizing. Exact mm/g entry is behind a toggle.
 (function (root) {
@@ -93,9 +97,20 @@
     const RgCalc = root.RgCalc, tier = RgCalc.sizeTier(dims, wt), cbm = dims[0] * dims[1] * dims[2] / 1e9;
     return { ...I, table, rate: cat.r, sizeIdx: tier.i, extra: tier.extra, cbm, apparel: RgCalc.isApparel(cat.p), price, cost, tier, n };
   };
-  // State = what save() writes (form field strings + cat/sizeMode/tierIdx/saver/simp). ctx.cost overrides the saved cost (imported 원가).
+  const TRACKED = ['monthly', 'ret', 'disc']; // fields whose writer matters (SRC)
+  // Saved-slot migration, one path for the widget (applyState) and the 사업자 합계 (evaluate on a raw slot) so both see the same numbers:
+  // pre-src saves carried retTouched/discTouched; a discount the seller never typed came from the 2026-09-20 auto-fill (25% · 42.5%) → 0.
+  function normalize(s) {
+    s = s || {};
+    const src = Object.assign({}, s.src);
+    if (!s.src) { if (s.discTouched) src.disc = 'user'; if (s.retTouched) src.ret = 'user'; }
+    const out = { ...s, src };
+    if (src.disc !== 'user' && numv(s.disc) > 0 && s.wing && s.wing.text) out.disc = DEFAULTS.disc;
+    return out;
+  }
+  // State = what save() writes (form field strings + cat/sizeMode/tierIdx/saver/simp/src). ctx.cost overrides the saved cost (imported 원가).
   function evaluate(FEES, s, ctx) {
-    const RgCalc = root.RgCalc; s = s || {}; ctx = ctx || {};
+    const RgCalc = root.RgCalc; s = normalize(s); ctx = ctx || {};
     const cat = s.cat && FEES.units[s.cat.u] && typeof s.cat.r === 'number' ? s.cat : null;
     const sizeMode = s.sizeMode === 'dims' || (!s.sizeMode && ['d1', 'd2', 'd3', 'wt'].some(f => s[f])) ? 'dims' : 'tier';
     const tierIdx = Number.isInteger(s.tierIdx) && RgCalc.SIZES[s.tierIdx] ? s.tierIdx : null;
@@ -125,15 +140,15 @@
     const costNoteOrig = costNote.innerHTML;
     const wingIn = q('.rg-wing-in'), wingGo = q('.rg-wing-go'), wingNote = q('.rg-wing-note'), wingClear = q('.rg-wing-clear'), wingOpts = q('.rg-wing-opts'), wingOut = q('.rg-wing-out');
     const WF = { lead: q('[data-w="lead"]'), cover: q('[data-w="cover"]') };
-    let W = null; // parsed Wing row (RgWing.parse().w) for the current slot
-    let KEY = o.key, cat = null, catAuto = false, BP = {}, retTouched = false, discTouched = false, ctx = {};
+    let W = null, WTEXT = ''; // parsed Wing row (RgWing.parse().w) for the current slot + the exact text it came from (edited text ≠ W)
+    let KEY = o.key, cat = null, catAuto = false, BP = {}, SRC = {}, ctx = {}, epoch = 0; // epoch: bumped on load/reset so late async answers are dropped
     let sizeMode = 'tier', tierIdx = null; // 'tier' = picked a 쿠팡 유형 (default) · 'dims' = typed mm/g
     let lastNum = null; // last headline number, to pulse the sheet when an input changes it
-    let CATS = null;
-    const catsReady = () => CATS ? Promise.resolve(CATS) : fetch(o.catsUrl).then(r => r.json()).then(d => {
+    let CATS = null, catsP = null;
+    const catsReady = () => catsP || (catsP = fetch(o.catsUrl).then(r => r.json()).then(d => {
       CATS = d.cats.map(c => ({ p: c[0], r: c[1], u: c[2], code: c[3], leaf: c[0].split('>').pop(), s: c[0].toLowerCase().replace(/\s+/g, '') }));
       return CATS;
-    });
+    }).catch(e => { catsP = null; throw e; }));
     const unitOf = c => FEES.units[c.u];
 
     // ----- category combobox -----
@@ -177,7 +192,7 @@
       menu.hidden = false; catInput.setAttribute('aria-expanded', 'true');
     };
     const close = () => { menu.hidden = true; active = -1; catInput.setAttribute('aria-expanded', 'false'); };
-    const choose = (c, auto) => { cat = c; catAuto = !!auto; catInput.value = c.leaf; catInput.title = c.p; close(); if (!retTouched) F.ret.value = String(RgCalc.returnDefault(c.p) * 100); render(); };
+    const choose = (c, auto) => { cat = c; catAuto = !!auto; catInput.value = c.leaf; catInput.title = c.p; close(); if (!SRC.ret) F.ret.value = String(RgCalc.returnDefault(c.p) * 100); render(); };
     catInput.addEventListener('focus', () => catsReady().then(() => { setTimeout(() => catInput.select(), 0); open(catInput.value); }));
     catInput.addEventListener('input', () => catsReady().then(() => { active = -1; open(catInput.value); }));
     catInput.addEventListener('keydown', e => {
@@ -201,47 +216,67 @@
     function paintTiers(i) { tiers.querySelectorAll('.tier').forEach(b => { const on = +b.dataset.i === i; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); }); tiers.classList.toggle('derived', sizeMode === 'dims'); }
 
     // ----- inputs / state -----
-    for (const f of FIELDS) F[f].addEventListener('input', render);
-    F.ret.addEventListener('input', () => { retTouched = true; });
-    F.disc.addEventListener('input', () => { discTouched = true; });
+    // the writer is recorded BEFORE render() saves — a separate listener registered after render ran second, so the first 할인/반품률
+    // keystroke was saved as untouched and a reload could wipe it (GPT-6 Pro review 2026-09-21)
+    for (const f of FIELDS) F[f].addEventListener('input', () => { if (TRACKED.includes(f)) SRC[f] = 'user'; render(); });
     saver.addEventListener('change', render); simp.addEventListener('change', render);
     q('.rg-reset').addEventListener('click', () => { reset(); catInput.focus(); });
     WF.lead.addEventListener('input', render); WF.cover.addEventListener('input', render);
-    wingGo.addEventListener('click', () => { if (!root.RgWing) return; const r = root.RgWing.parse(wingIn.value); W = r.ok ? r.w : null; wingNote.textContent = r.ok ? (r.missing.length ? `읽었어요 · 못 찾은 것: ${r.missing.join(' · ')}` : '') : (wingIn.value.trim() ? '판매량(어제·지난 7일·30일)을 못 찾았어요 — 재고현황의 상품 줄을 통째로 복사해 주세요. 계속 안 되면 hello@jikguse.com 으로 화면 텍스트를 보내 주세요.' : ''); if (W) fillFromWing(); render(); if (W) wingOut.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    wingGo.addEventListener('click', () => {
+      if (!root.RgWing) return;
+      const r = root.RgWing.parse(wingIn.value); W = r.ok ? r.w : null; WTEXT = W ? wingIn.value : '';
+      wingNote.textContent = r.ok ? (r.missing.length ? `읽었어요 · 못 찾은 것: ${r.missing.join(' · ')}` : '') : (wingIn.value.trim() ? '판매량(어제·지난 7일·30일)을 못 찾았어요 — 재고현황의 상품 줄을 통째로 복사해 주세요. 계속 안 되면 hello@jikguse.com 으로 화면 텍스트를 보내 주세요.' : '');
+      if (W) fillFromWing();
+      render();
+      if (W) wingOut.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     wingIn.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) wingGo.click(); });
-    wingClear.addEventListener('click', () => { wingIn.value = ''; W = null; wingNote.textContent = ''; render(); });
-    // measured values replace the estimates: 월 판매량 ← 지난 30일 판매량, 반품률 ← 반품률(월)
+    // an edited paste is a draft: the old parse must not keep describing text that no longer says that
+    wingIn.addEventListener('input', () => { if (W && wingIn.value !== WTEXT) { W = null; WTEXT = ''; wingNote.textContent = '내용이 바뀌었어요 — 진단하기를 다시 눌러 주세요'; render(); } });
+    wingClear.addEventListener('click', () => { wingIn.value = ''; W = null; WTEXT = ''; wingNote.textContent = ''; render(); }); // text + parse only; inputs stay
     const wingMonthly = () => W && (W.d30.sold != null ? W.d30.sold : W.d7.sold != null ? Math.round(W.d7.sold / 7 * 30) : null);
+    const wingMonthlyEst = () => !!W && W.d30.sold == null && W.d7.sold != null; // 7일 × 30/7 is an estimate, not a measurement
     const wingRet = () => W && W.ret.rate != null ? Math.round(W.ret.rate * 10) / 10 : null;
+    const wingFinal = () => W ? (W.price.final != null ? W.price.final : W.price.list) : null; // 최종구매가, else 표시가 (자동조정 없음)
+    // 'same' = the pasted screen prices this product (판매가 칸, 할인 반영 == 최종구매가) · 'off' = differs · 'unknown' = no price read
+    const wingPriceMatch = () => { const fin = wingFinal(), sold = numv(F.price.value) * (1 - numv(F.disc.value) / 100); return !(fin > 0) || !(sold > 0) ? 'unknown' : Math.abs(sold - fin) <= 1 ? 'same' : 'off'; };
     // 판매가·할인 칸은 건드리지 않는다 — 판매가는 항상 사용자가 낱개에 적은 금액 (오너 2026-09-21: 윙 표시가 9,800 → 최종구매가 7,350 을 할인율로 역산해 넣지 말 것).
-    // 윙에서 가져오는 건 실측치뿐: 월 판매량 ← 지난 30일, 반품률 ← 반품률(월).
+    // 월 판매량 ← 지난 30일, 반품률 ← 반품률(월): only into fields the seller never typed, only when the screen is verifiably this product.
     function fillFromWing() {
+      if (wingPriceMatch() !== 'same') return;
+      applyWing({ monthly: SRC.monthly !== 'user', ret: SRC.ret !== 'user' });
+    }
+    function applyWing(which) {
       const m = wingMonthly(), r = wingRet();
-      if (m != null) F.monthly.value = String(m);
-      if (r != null) { F.ret.value = String(r); retTouched = true; }
+      if (which.monthly && m != null) { F.monthly.value = String(m); SRC.monthly = 'wing'; }
+      if (which.ret && r != null) { F.ret.value = String(r); SRC.ret = 'wing'; }
     }
 
-    function save() { if (KEY) localStorage.setItem(KEY, JSON.stringify(state())); }
-    function applyState(s) {
+    function save() { if (!KEY) return; try { localStorage.setItem(KEY, JSON.stringify(state())); } catch (e) { /* storage blocked/full — the calculation still shows */ } }
+    function applyState(raw) {
+      const s = normalize(raw);
       cat = s.cat && FEES.units[s.cat.u] && typeof s.cat.r === 'number' ? s.cat : null; // 저장된 선택이 새 요금표와 안 맞으면 버린다
       catInput.value = cat ? cat.leaf : ''; catInput.title = cat ? cat.p : ''; catAuto = !!(cat && s.catAuto);
-      BP = s.bp || {}; retTouched = !!s.retTouched; saver.checked = !!s.saver; simp.checked = !!s.simp;
+      BP = s.bp || {}; SRC = s.src; saver.checked = !!s.saver; simp.checked = !!s.simp;
       const wg = s.wing || {}; wingIn.value = wg.text || ''; WF.lead.value = wg.lead || '25'; WF.cover.value = wg.cover || '30';
-      W = wg.text && root.RgWing ? (r => r.ok ? r.w : null)(root.RgWing.parse(wg.text)) : null; wingNote.textContent = '';
+      WTEXT = wg.parsed != null ? wg.parsed : (wg.text || ''); // pre-parsed saves: the text was what got parsed
+      W = wg.text && wg.text === WTEXT && root.RgWing ? (r => r.ok ? r.w : null)(root.RgWing.parse(wg.text)) : null; if (!W) WTEXT = '';
+      wingNote.textContent = W || !wg.text ? '' : '내용이 바뀌었어요 — 진단하기를 다시 눌러 주세요';
       for (const f of FIELDS) F[f].value = s[f] != null && s[f] !== '' ? s[f] : (DEFAULTS[f] || '');
-      // 2026-09-20 이전 버전이 윙 붙여넣기(25%)·'실판매가로 다시 계산'(42.5%)으로 넣어 둔 할인 — 사용자가 직접 친 값(discTouched)이 아니면 지운다 (오너: 판매가는 낱개 칸 값 그대로)
-      discTouched = !!s.discTouched;
-      if (!discTouched && numv(F.disc.value) > 0 && wg.text) F.disc.value = DEFAULTS.disc;
+      // pre-src saves: the old auto-fill wrote 월 판매량·반품률 with no marker — the ones still equal to the Wing values were its (once, at migration)
+      if (!raw || !raw.src) { if (W && wingMonthly() != null && F.monthly.value === String(wingMonthly())) SRC.monthly = 'wing'; if (W && SRC.ret === 'user' && wingRet() != null && numv(F.ret.value) === wingRet()) SRC.ret = 'wing'; }
       tierIdx = Number.isInteger(s.tierIdx) && RgCalc.SIZES[s.tierIdx] ? s.tierIdx : null;
       sizeMode = s.sizeMode === 'dims' || (!s.sizeMode && ['d1', 'd2', 'd3', 'wt'].some(f => F[f].value)) ? 'dims' : 'tier'; // pre-toggle saves had dims only
       showDims(sizeMode === 'dims');
       lastNum = null;
     }
-    // Switch the saved-state slot; ctx.cost (per-unit landed cost) overrides the saved cost, ctx.note replaces the cost hint.
+    // Switch the saved-state slot; ctx.cost (per-unit landed cost) is linked — the cost box shows it read-only so the widget, the item
+    // chips and the whole-shipment total can never disagree on 원가; ctx.note replaces the cost hint.
     function load(key, c) {
-      KEY = key; ctx = c || {};
+      KEY = key; ctx = c || {}; epoch++;
       let s = {}; try { s = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { /* fresh */ }
       applyState(s);
+      F.cost.readOnly = ctx.cost != null;
       if (ctx.cost != null) F.cost.value = String(Math.round(ctx.cost));
       costNote.innerHTML = ctx.note != null ? esc(ctx.note) : costNoteOrig;
       render();
@@ -250,15 +285,16 @@
     // No category saved for this slot but the sheet gave a 품명 → pick one; if none fits, leave the 품명 in the box to search from.
     function matchFromQuery() {
       if (!ctx.query) return;
-      const key = KEY;
+      const ep = epoch, query = ctx.query, hs = ctx.hs;
       catsReady().then(() => {
-        if (KEY !== key || cat) return; // slot switched meanwhile — stale answer
-        const c = autoMatch(ctx.query, ctx.hs);
-        if (c) choose(c, true); else { catInput.value = ctx.query; render(); }
-      });
+        if (epoch !== ep || cat) return; // slot switched or reset meanwhile (A→B→A included) — stale answer
+        const c = autoMatch(query, hs);
+        if (c) choose(c, true); else { catInput.value = query; render(); }
+      }).catch(() => {});
     }
     function reset() {
       if (KEY) localStorage.removeItem(KEY);
+      epoch++;
       applyState({});
       if (ctx.cost != null) F.cost.value = String(Math.round(ctx.cost)); // the imported cost is context, not input — keep it
       render();
@@ -266,7 +302,7 @@
     }
 
     function state() {
-      const s = { cat, catAuto, bp: BP, saver: saver.checked, simp: simp.checked, retTouched, discTouched, sizeMode, tierIdx, wing: { text: wingIn.value, lead: WF.lead.value, cover: WF.cover.value } };
+      const s = { cat, catAuto, bp: BP, saver: saver.checked, simp: simp.checked, src: SRC, sizeMode, tierIdx, wing: { text: wingIn.value, parsed: WTEXT, lead: WF.lead.value, cover: WF.cover.value } };
       for (const f of FIELDS) s[f] = F[f].value;
       return s;
     }
@@ -368,75 +404,102 @@
     const n1 = x => (Math.round(x * 10) / 10).toLocaleString('ko-KR');
     const cnt = x => Math.round(x).toLocaleString('ko-KR') + '개';
     const signPct = r => (r >= 0 ? '+' : '−') + pct1(Math.abs(r));
+    const signed = v => `${v < 0 ? '−' : ''}${won(Math.abs(v))}`;
+    const ro = w => { const c = w.charCodeAt(w.length - 1); if (c < 0xac00 || c > 0xd7a3) return /[0-9]$/.test(w) ? (/[136780]$/.test(w) ? '으로' : '로') : '로'; const f = (c - 0xac00) % 28; return f === 0 || f === 8 ? '로' : '으로'; };
+    const srcLabel = f => SRC[f] === 'user' ? '직접 입력' : SRC[f] === 'wing' ? '윙에서 넣음' : f === 'ret' ? '카테고리 추정치' : '기본값';
+    // 월 순이익 for a different 월 판매량 = the whole model re-run at that volume (반품 무료 20건·세이버 안분 depend on it) — never 개당 × other units
+    const profitAt = units => { const e = evaluate(FEES, { ...state(), monthly: String(units) }); return e.ok ? e.c.monthlyProfit : null; };
     function drawWing(ev) {
       wingClear.hidden = !wingIn.value.trim();
       wingOpts.hidden = !W;
-      F.monthly.closest('.field').classList.toggle('wing', !!W && wingMonthly() != null && F.monthly.value === String(wingMonthly()));
-      F.ret.closest('.field').classList.toggle('wing', !!W && wingRet() != null && numv(F.ret.value) === wingRet());
+      F.monthly.closest('.field').classList.toggle('wing', !!W && SRC.monthly === 'wing');
+      F.ret.closest('.field').classList.toggle('wing', !!W && SRC.ret === 'wing');
       if (!W) { wingOut.innerHTML = ''; return; }
       const RgWing = root.RgWing, I = ev.I;
-      const list = W.price.list, fin = W.price.final != null ? W.price.final : list;
-      // 쿠팡 예상 비용은 최종구매가(7,350) 기준이고, 이 계산기의 판매가는 사용자가 낱개에 적은 금액이다. 둘이 같을 때만 유형·카테고리 대조가 뜻이 있다.
+      const list = W.price.list, fin = wingFinal(), match = wingPriceMatch();
+      // 쿠팡 예상 비용은 최종구매가(7,350) 기준이고, 이 계산기의 판매가는 사용자가 낱개에 적은 금액이다. 둘이 같다고 확인될 때만 유형·카테고리 대조가 뜻이 있다.
       const soldNow = I.price * (1 - I.sellerDisc / 100), basis = soldNow;
-      const priceOff = fin > 0 && I.price > 0 && Math.abs(soldNow - fin) > 1; // 판매가 칸이 윙 최종구매가와 다르다 — 다른 상품이거나 가격 가정이 다름
+      const canCompare = ev.ok && match === 'same' && W.cost.unit != null;
       const perUnit = ev.ok ? ev.c.expected : null;
       const lead = numv(WF.lead.value) || 25, cover = numv(WF.cover.value) || 0;
       const d = RgWing.diagnose(W, { lead, cover, perUnit });
-      const inf = ev.ok && !priceOff && W.cost.unit != null ? RgWing.inferTier(W.cost.unit, basis, cat.r, unitOf(cat)) : null;
-      if (ev.ok && !priceOff && W.cost.unit != null && !CATS) catsReady().then(() => render());
-      const fix = ev.ok && !priceOff && W.cost.unit != null && CATS ? RgWing.inferFees(W.cost.unit, basis, FEES, CATS, W.name) : null;
+      const inf = canCompare ? RgWing.inferTier(W.cost.unit, basis, cat.r, unitOf(cat)) : null;
+      if (canCompare && !CATS) catsReady().then(() => render()).catch(() => {});
+      const fix = canCompare && CATS ? RgWing.inferFees(W.cost.unit, basis, FEES, CATS, W.name) : null;
       const fixTier = fix ? fix.tierIdx : inf ? inf.i : null;
       const tierOff = fixTier != null && fixTier !== I.tier.i; // 쿠팡 비용과 맞는 유형이 지금 고른 유형이 아니다
       const rateOff = !!fix && (fix.rate !== cat.r || !fix.units.includes(cat.u)); // 수수료율(카테고리)이 쿠팡 등록과 다르다
       const fixCat = rateOff && fix.cat ? fix.cat : null;
       const catOff = fix ? rateOff : !!inf && Math.abs(inf.gap) > 0.15; // 원 단위 재현이 안 되면 15% 넘게 어긋날 때만 의심
-      const evFix = tierOff || fixCat ? evaluate(FEES, { ...state(), sizeMode: 'tier', tierIdx: fixTier != null ? fixTier : I.tier.i, cat: fixCat || cat }) : null;
+      // the recommendation is one patch — previewed and committed as the same object (카테고리만 바뀌면 사이즈 모드는 건드리지 않는다)
+      const patch = {};
+      if (tierOff) { patch.tierIdx = fixTier; patch.sizeMode = 'tier'; }
+      if (fixCat) { patch.cat = fixCat; if (!SRC.ret) patch.ret = String(RgCalc.returnDefault(fixCat.p) * 100); }
+      const evFix = Object.keys(patch).length ? evaluate(FEES, { ...state(), ...patch }) : null;
       const perUnitFix = evFix && evFix.ok ? evFix.c.expected : null;
-      const dFix = perUnitFix != null ? RgWing.diagnose(W, { lead, cover, perUnit: perUnitFix }) : null;
       const fixLabel = [tierOff ? RgCalc.SIZES[fixTier].name : null, fixCat ? `${fixCat.leaf}(${fixCat.r}%)` : null].filter(Boolean).join(' · ');
-      const nowLabel = `${I.tier.name} · ${cat.leaf}(${cat.r}%)`;
-      const tone = (perUnitFix != null ? perUnitFix : perUnit) != null && (perUnitFix != null ? perUnitFix : perUnit) < 0 ? 'severe' : tierOff || catOff || (d.shortage > 0) || (d.trend != null && d.trend < -0.3) ? 'moderate' : 'balanced';
+      const patchLabel = fixLabel + (patch.ret != null && numv(patch.ret) !== numv(F.ret.value) ? ` · 반품률 ${patch.ret}%(카테고리 기본값)` : ''); // every field the patch changes is named on the button
+      const nowLabel = ev.ok ? `${I.tier.name} · ${cat.leaf}(${cat.r}%)` : '';
+      const tone = perUnit != null && perUnit < 0 ? 'severe' : tierOff || catOff || (d.shortage > 0) || (d.trend != null && d.trend < -0.3) ? 'moderate' : 'balanced';
+      // 윙 값 vs 현재 입력 — differences are offered, never pushed (판매가 칸이 최종구매가와 같고 직접 친 적이 없는 칸만 붙여넣을 때 채워진다)
+      const wm = wingMonthly(), wr = wingRet();
+      const offer = { monthly: wm != null && numv(F.monthly.value) !== wm, ret: wr != null && numv(F.ret.value) !== wr };
       const rows = [];
       // 값은 항상 이 계산기의 판매가(사용자가 낱개에 적은 금액, 할인 반영) — 윙 표시가·최종구매가는 설명줄에만 (오너 2026-09-21)
-      if (list) rows.push(['판매가', I.sellerDisc > 0 ? `${won(I.price)} − ${I.sellerDisc}%` : won(I.price), `윙 표시가 ${won(list)}${W.price.final != null && W.price.final < list ? ` · 최종구매가 ${won(W.price.final)} (자동조정 할인)` : ''} · ${priceOff ? `이 계산기는 위 판매가 칸 ${won(soldNow)}으로 계산합니다 — 윙 최종구매가와 달라 쿠팡 예상 비용과의 대조는 건너뜁니다` : '위 판매가 칸과 같아요'} · ${d.revIsList === true ? `윙 매출 ${won(W.d30.rev)} = 단품 ${cnt(d.revUnits)}${d.revInferred ? '(역산)' : ''} × 표시가 — 할인·번들 매출은 이 집계에 없어 실판매가는 못 구합니다` : d.revIsList === false ? `윙 매출 ${won(W.d30.rev)} ÷ ${cnt(d.revUnits)} = ${won(d.revPerUnit)} — 윙 매출은 단품 판매분만 표시가로 집계해서 번들이 섞이면 낮게 나옵니다. 실판매가로 쓰지 마세요` : '매출 박스가 없어요'}`]);
+      rows.push(['판매가', I.price > 0 ? (I.sellerDisc > 0 ? `${won(I.price)} − ${I.sellerDisc}% = ${won(soldNow)}` : won(I.price)) : '위 판매가 칸 비어 있음',
+        `${list ? `윙 표시가 ${won(list)}${W.price.final != null && W.price.final < list ? ` · 최종구매가 ${won(W.price.final)} (자동조정 할인)` : ''}` : '윙 화면에서 판매가를 못 읽었어요'} · ${match === 'same' ? '위 판매가 칸과 같아요' : match === 'off' ? `이 계산기는 위 판매가 칸 ${won(soldNow)}으로 계산합니다 — 윙 최종구매가와 달라 쿠팡 예상 비용과의 대조는 건너뜁니다` : '판매가를 대조할 수 없어 쿠팡 예상 비용과의 대조는 건너뜁니다'} · ${d.revIsList === true ? `윙 매출 ${won(W.d30.rev)} = 단품 ${cnt(d.revUnits)}${d.revInferred ? '(역산)' : ''} × 표시가 — 할인·번들 매출은 이 집계에 없어 실판매가는 못 구합니다` : d.revIsList === false ? `윙 매출 ${won(W.d30.rev)} ÷ ${cnt(d.revUnits)} = ${won(d.revPerUnit)} — 윙 매출은 단품 판매분만 표시가로 집계해서 번들이 섞이면 낮게 나옵니다. 실판매가로 쓰지 마세요` : '매출 박스가 없어요'}`]);
+      if (wm != null) rows.push(['월 판매량', `${cnt(wm)}${wingMonthlyEst() ? ' (7일 환산 추정)' : ' (지난 30일)'}`, offer.monthly ? `위 월 판매량 칸은 ${cnt(numv(F.monthly.value))} (${srcLabel('monthly')}) — 그대로 계산합니다` : `위 월 판매량 칸과 같아요 (${srcLabel('monthly')})`]);
       if (d.rate != null) rows.push(['판매 속도', `하루 ${n1(d.rate)}개`, `${W.d7.sold != null ? `지난 7일 ${cnt(W.d7.sold)}` : ''}${W.d30.sold != null ? ` · 30일 ${cnt(W.d30.sold)} (하루 ${n1(d.rate30)}개)` : ''}${d.trend != null ? ` → 최근 7일이 30일 평균보다 ${signPct(d.trend)}` : ''}${W.y.sold != null ? ` · 어제 ${cnt(W.y.sold)}` : ''}`]);
       if (d.cvr.d7 != null || d.cvr.d30 != null) rows.push(['구매 전환율', pct1(d.cvr.d7 != null ? d.cvr.d7 : d.cvr.d30), `${d.cvr.d7 != null ? `7일 조회 ${W.d7.views.toLocaleString('ko-KR')} → 구매 ${W.d7.sold}` : ''}${d.cvr.d30 != null ? ` · 30일 ${pct1(d.cvr.d30)} (조회 ${W.d30.views.toLocaleString('ko-KR')})` : ''}`]);
       if (d.bundleShare != null) rows.push(['번들 비중 (30일)', pct1(d.bundleShare), `단품 ${cnt(W.d30.single)} · 번들 ${cnt(W.d30.bundle)} — 묶음이 많이 팔리면 위 낱개 vs 묶음 표의 묶음 판매가를 실제 값으로 맞춰 보세요`]);
       if (W.stock.avail != null) rows.push(['재고', d.daysTotal != null ? `${n1(d.daysTotal)}일치` : cnt(d.stock.total), `판매가능 ${cnt(W.stock.avail)}${W.stock.availDays != null ? ` (쿠팡 표시 ${W.stock.availDays}일)` : ''}${W.stock.inbound != null ? ` + 입고중 ${cnt(W.stock.inbound)}` : ''} = ${cnt(d.stock.total)}${d.daysAvail != null ? ` · 지금 속도로 판매가능분은 ${n1(d.daysAvail)}일, 입고중까지 ${n1(d.daysTotal)}일` : ''}`]);
-      if (d.reorderQty != null) rows.push(['다음 수입 발주', d.reorderQty > 0 ? cnt(d.reorderQty) : '아직 필요 없음', `${d.shortage > 0 ? `지금 발주해도 도착 전 ${n1(d.gapDays)}일 품절 · 못 파는 ${cnt(d.shortage)}${d.lostProfit != null ? ` = 놓치는 순이익 ${won(d.lostProfit)}` : ''} · ` : `리드타임 ${lead}일 안에 품절 없음 · `}리드타임 ${lead}일 + 여유 ${cover}일 = ${cnt(d.rate * (lead + cover))} 필요 − 재고 ${cnt(d.stock.total)}${W.stock.recommend != null ? ` · 쿠팡 입고권장 ${cnt(W.stock.recommend)}` : ''}`]);
-      if (W.ret.rate != null) rows.push(['반품률', pct1(W.ret.rate / 100), `${W.ret.month != null ? `${W.ret.month}월 실측 · ` : ''}${F.ret.closest('.field').classList.contains('wing') ? '위 반품률 칸에 넣었어요 (카테고리 추정치 대신)' : '위 반품률 칸은 직접 고친 값이 우선입니다'}`]);
+      if (d.reorderQty != null) rows.push(['다음 수입 발주', d.reorderQty > 0 ? cnt(d.reorderQty) : '아직 필요 없음', `${d.shortage > 0 ? `지금 발주해도 도착 전 ${n1(d.gapDays)}일 품절 · 못 파는 ${cnt(d.shortage)}${d.lostProfit != null ? ` = 놓치는 순이익 ${won(d.lostProfit)} (지금 설정의 개당 순이익 기준)` : ''} · ` : `리드타임 ${lead}일 안에 품절 없음 · `}리드타임 ${lead}일 + 여유 ${cover}일 = ${cnt(d.rate * (lead + cover))} 필요 − 재고 ${cnt(d.stock.total)}${W.stock.recommend != null ? ` · 쿠팡 입고권장 ${cnt(W.stock.recommend)}` : ''}`]);
+      if (wr != null) rows.push(['반품률', pct1(W.ret.rate / 100), `${W.ret.month != null ? `${W.ret.month}월 실측 · ` : ''}${offer.ret ? `위 반품률 칸은 ${numv(F.ret.value)}% (${srcLabel('ret')}) — 그대로 계산합니다` : `위 반품률 칸과 같아요 (${srcLabel('ret')})`}`]);
       if (W.cost.unit != null) {
-        const mine = ev.ok && !priceOff ? ev.c.commission + ev.c.wh + ev.c.sh : null;
+        const mine = canCompare ? ev.c.commission + ev.c.wh + ev.c.sh : null;
         const storageNote = W.cost.storageMonth != null ? ` · 이번달 누적보관비 ${won(W.cost.storageMonth)}` : '';
-        rows.push(['쿠팡 예상 비용 (개당)', won(W.cost.unit), mine == null ? `${priceOff ? `쿠팡은 최종구매가 ${won(fin)} 기준으로 이 값을 냅니다 — 판매가 칸에 ${won(fin)}을 넣으면 수수료율·사이즈 유형을 대조해 드려요` : '카테고리·사이즈 유형을 넣으면 계산기 비용과 대조합니다'}${storageNote}`
+        rows.push(['쿠팡 예상 비용 (개당)', won(W.cost.unit), mine == null ? `${!ev.ok ? '카테고리·판매가·사이즈 유형을 넣으면 계산기 비용과 대조합니다' : match === 'off' ? `쿠팡은 최종구매가 ${won(fin)} 기준으로 이 값을 냅니다 — 판매가 칸에 ${won(fin)}을 넣으면 수수료율·사이즈 유형을 대조해 드려요` : '윙 화면의 판매가를 못 읽어 대조하지 않습니다'}${storageNote}`
           : `이 계산기의 판매수수료 + 입출고비 + 배송비 (판매가 ${won(basis)} 기준) ${won(mine)} → 차이 ${signPct((mine - W.cost.unit) / W.cost.unit)}${
-            fix ? ` — 쿠팡 비용은 수수료 ${fix.rate}% × ${won(basis)} + ${RgCalc.SIZES[fix.tierIdx].name} 입출고·배송비로 원 단위까지 맞아요${tierOff || rateOff ? `. 지금은 ${nowLabel}${rateOff && !fixCat ? ` — 위 카테고리 칸에서 수수료 ${fix.rate}% 카테고리를 골라 주세요` : ''}` : ' · 카테고리·사이즈가 실제와 맞아요'}`
-            : tierOff && !catOff ? ` — 쿠팡 비용은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})과 맞는데 지금은 ${I.tier.name}으로 되어 있어요` : tierOff ? ` — 가장 가까운 유형은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})이지만 그래도 ${signPct(inf.gap)} 차이. 지금은 ${I.tier.name}이고, 카테고리(수수료율)도 실제 등록과 다른지 확인하세요` : catOff ? ' — 어느 사이즈 유형으로도 안 맞아요. 카테고리(수수료율)가 실제 등록과 다른지 확인하세요' : ' — 카테고리·사이즈가 실제와 맞아요'}${storageNote}`]);
+            fix ? ` — 지금 요금표에서는 수수료 ${fix.rate}% × ${won(basis)} + ${RgCalc.SIZES[fix.tierIdx].name} 입출고·배송비가 원 단위까지 맞아요${tierOff || rateOff ? `. 지금은 ${nowLabel}${rateOff && !fixCat ? ` — 위 카테고리 칸에서 수수료 ${fix.rate}% 카테고리를 골라 주세요` : ''}` : ' · 카테고리(수수료율)·사이즈 유형이 쿠팡 비용과 맞아요'}`
+            : tierOff && !catOff ? ` — 쿠팡 비용은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})과 맞는데 지금은 ${I.tier.name}으로 되어 있어요` : tierOff ? ` — 가장 가까운 유형은 ${RgCalc.SIZES[inf.i].name}(${won(inf.est)})이지만 그래도 ${signPct(inf.gap)} 차이. 지금은 ${I.tier.name}이고, 카테고리(수수료율)도 실제 등록과 다른지 확인하세요` : catOff ? ' — 어느 사이즈 유형으로도 안 맞아요. 카테고리(수수료율)가 실제 등록과 다른지 확인하세요' : ' — 카테고리(수수료율)·사이즈 유형이 쿠팡 비용과 맞아요'}${storageNote}`]);
       }
       const tbl = rows.map(([k, v, note]) => `<tr><th>${esc(k)}<small>${esc(note)}</small></th><td>${esc(v)}</td></tr>`).join('');
-      // 머리 숫자: 쿠팡 비용과 맞는 설정(dFix)이 있으면 그것, 아니면 지금 입력(d). 월 = 지난 30일 실제 판매량 × 개당, 7일 속도 환산은 따로.
-      const H = dFix || d, pu = dFix ? perUnitFix : perUnit;
-      const signed = v => `${v < 0 ? '−' : ''}${won(Math.abs(v))}`;
-      const monthLine = D => `${W.d30.sold != null ? `지난 30일 ${cnt(W.d30.sold)}` : `하루 ${n1(D.rate)}개 × 30일`} × 개당 순이익 ${signed(D === dFix ? perUnitFix : perUnit)}`;
-      const paceLine = D => D.paceProfit != null && W.d30.sold != null && Math.round(D.paceUnits) !== Math.round(D.monthlyUnits) ? ` · 최근 7일 속도(하루 ${n1(D.rate)}개)가 이어지면 월 ${cnt(D.paceUnits)} → ${signed(D.paceProfit)}` : '';
-      const head = H.monthlyProfit != null
-        ? `<div class="sheet-num"><span class="num">${H.monthlyProfit < 0 ? '−' : ''}${Math.round(Math.abs(H.monthlyProfit)).toLocaleString('ko-KR')}</span><span class="pct">원/월</span></div><p class="sheet-title">${dFix ? `쿠팡 예상 비용과 맞는 ${fixLabel} 기준 · ` : ''}${monthLine(H)}${pu < 0 ? ' — 적자입니다' : ''}${paceLine(H)}</p>${
-            dFix ? `<p class="sheet-text"><strong>지금 고른 ${nowLabel}으로는 개당 ${signed(perUnit)} → 월 ${signed(d.monthlyProfit)}</strong> — 쿠팡이 이 상품에 매기는 비용(${won(W.cost.unit)})과 안 맞아요. 아래 버튼으로 바꾸면 위 계산기도 같은 숫자가 됩니다.</p>` : ''}`
+      // 머리 숫자 = 지금 입력 그대로 (월 판매량 칸 × 개당). 쿠팡 비용과 맞는 다른 설정, 윙 판매량, 7일 속도는 전부 "미적용 미리보기"로 따로.
+      const mo = ev.ok && I.monthly > 0 ? ev.c.monthlyProfit : null;
+      const paceProfit = ev.ok && d.paceUnits != null && Math.round(d.paceUnits) !== Math.round(I.monthly) ? profitAt(d.paceUnits) : null;
+      const wingMo = ev.ok && offer.monthly && wm > 0 ? profitAt(wm) : null;
+      const head = mo != null
+        ? `<div class="sheet-num"><span class="num">${mo < 0 ? '−' : ''}${Math.round(Math.abs(mo)).toLocaleString('ko-KR')}</span><span class="pct">원/월</span></div><p class="sheet-title">월 판매량 ${cnt(I.monthly)}${SRC.monthly === 'wing' ? ' (윙 지난 30일)' : ''} × 개당 순이익 ${signed(perUnit)}${perUnit < 0 ? ' — 적자입니다' : ''} · ${nowLabel}</p>${
+            wingMo != null ? `<p class="sheet-text">윙 ${wingMonthlyEst() ? '7일 환산' : '지난 30일'} ${cnt(wm)}로 보면 월 ${signed(wingMo)} (미적용)</p>` : ''}${
+            paceProfit != null ? `<p class="sheet-text">최근 7일 속도(하루 ${n1(d.rate)}개)가 이어지면 월 ${cnt(d.paceUnits)} → ${signed(paceProfit)} (미적용)</p>` : ''}${
+            perUnitFix != null ? `<p class="sheet-text"><strong>쿠팡이 이 상품에 매기는 비용(${won(W.cost.unit)})은 ${fixLabel}과 맞아요</strong> — 그 설정이면 개당 ${signed(perUnitFix)} → 월 ${signed(evFix.c.monthlyProfit)} (미적용${patchLabel !== fixLabel ? ` · 바꾸면 반품률도 ${patch.ret}% 카테고리 기본값으로` : ''} · 아래 버튼으로 바꾸면 위 계산기도 같은 숫자가 됩니다)</p>` : ''}`
+        : ev.ok ? `<p class="sheet-title">개당 순이익 ${signed(perUnit)} · 월 판매량 칸이 비어 있어 월 순이익은 계산하지 않았어요</p>`
         : d.rate != null ? `<p class="sheet-title">하루 ${n1(d.rate)}개 (월 ${cnt(d.monthlyUnits)})</p><p class="sheet-text">위에 카테고리·판매가·사이즈 유형을 넣으면 월 순이익 전망과 품절로 놓치는 순이익까지 계산됩니다.</p>`
         : `<p class="sheet-title">최근 판매가 없어 속도·재고 예측은 못 합니다</p>`;
-      const ro = w => { const c = w.charCodeAt(w.length - 1); if (c < 0xac00 || c > 0xd7a3) return /[0-9]$/.test(w) ? (/[136780]$/.test(w) ? '으로' : '로') : '로'; const f = (c - 0xac00) % 28; return f === 0 || f === 8 ? '로' : '으로'; };
-      const apply = evFix ? `<p class="sheet-actions"><button type="button" class="next alt rg-wing-tier">${fixLabel}${ro(fixCat ? fixCat.leaf : RgCalc.SIZES[fixTier].name)} 바꾸기</button></p>` : '';
-      const other = priceOff ? `<p class="sheet-text"><strong>붙여넣은 윙 화면의 최종구매가는 ${won(fin)}, 이 품목 판매가 칸은 ${won(soldNow)}입니다.</strong> 다른 상품의 화면이면 월 판매량·반품률 자동 입력도 이 품목에 맞지 않아요. <button type="button" class="link-btn rg-wing-drop">이 품목에서 윙 진단 지우기</button></p>` : '';
+      const useBtn = offer.monthly || offer.ret ? `<button type="button" class="next alt rg-wing-use">${[offer.monthly ? `월 판매량 ${cnt(wm)}` : null, offer.ret ? `반품률 ${wr}%` : null].filter(Boolean).join(' · ')} 위 칸에 넣기</button>` : '';
+      const fixBtn = evFix ? `<button type="button" class="next alt rg-wing-tier">${patchLabel}${ro(patchLabel !== fixLabel ? '기본값' : fixCat ? fixCat.leaf : RgCalc.SIZES[fixTier].name)} 바꾸기</button>` : '';
+      const undo = SRC.monthly === 'wing' || SRC.ret === 'wing' ? `<button type="button" class="link-btn rg-wing-drop">윙에서 넣은 ${[SRC.monthly === 'wing' ? '월 판매량' : null, SRC.ret === 'wing' ? '반품률' : null].filter(Boolean).join('·')} 되돌리기</button>` : '';
+      const actions = useBtn || fixBtn || undo ? `<p class="sheet-actions">${useBtn}${fixBtn}${undo}</p>` : '';
+      const other = match === 'off' ? `<p class="sheet-text"><strong>붙여넣은 윙 화면의 최종구매가는 ${won(fin)}, 이 품목 판매가 칸은 ${won(soldNow)}입니다.</strong> 다른 상품의 화면이면 아래 월 판매량·반품률도 이 품목 것이 아니에요 — 위 칸에는 넣지 않았습니다.</p>` : '';
       wingOut.innerHTML = `<section class="sheet ${tone}"><p class="sheet-label">${W.name ? esc(W.name) + ' · ' : ''}윙 실적 진단</p>${other}${head}
-        <div class="tbl-wrap"><table class="tbl mini rg"><tbody>${tbl}</tbody></table></div>${apply}
-        <p class="muted small basis">속도·재고 예측은 최근 7일 판매량(없으면 30일)이 이어진다는 가정입니다. 발주 수량 = 하루 판매량 × (리드타임 + 여유) − (판매가능 + 입고중). 월 순이익 = 지난 30일 실제 판매량 × 개당 순이익(반품 반영, 부가세 별도). 쿠팡 예상 비용(개당)은 최종구매가 × 수수료율 + 입출고비 + 배송비와 원 단위로 맞아, 사이즈 유형·카테고리 검증에 씁니다.</p></section>`;
+        <div class="tbl-wrap"><table class="tbl mini rg"><tbody>${tbl}</tbody></table></div>${actions}
+        <p class="muted small basis">붙여넣은 윙 화면은 참고 자료입니다 — 판매가·할인은 절대 바꾸지 않고, 월 판매량·반품률은 직접 친 적 없는 칸에만(판매가 칸이 윙 최종구매가와 같을 때) 들어가며 그 외에는 버튼으로만 넣습니다. 속도·재고 예측은 최근 7일 판매량(없으면 30일)이 이어진다는 가정. 발주 수량 = 하루 판매량 × (리드타임 + 여유) − (판매가능 + 입고중). 월 순이익 = 월 판매량 칸 × 개당 순이익(반품 반영, 부가세 별도). 쿠팡 예상 비용(개당)은 최종구매가 × 수수료율 + 입출고비 + 배송비와 원 단위로 맞아, 사이즈 유형·카테고리 검증에 씁니다.</p></section>`;
+      const ub = wingOut.querySelector('.rg-wing-use');
+      if (ub) ub.addEventListener('click', () => { applyWing(offer); render(); });
+      // undo = the fields this widget filled from Wing go back to defaults; a value the seller typed (even if equal to Wing's) is never touched
       const db = wingOut.querySelector('.rg-wing-drop');
-      if (db) db.addEventListener('click', () => { const m = wingMonthly(), r = wingRet(); if (m != null && F.monthly.value === String(m)) F.monthly.value = DEFAULTS.monthly; if (r != null && numv(F.ret.value) === r) { F.ret.value = cat ? String(RgCalc.returnDefault(cat.p) * 100) : ''; retTouched = false; } wingIn.value = ''; W = null; wingNote.textContent = ''; render(); });
+      if (db) db.addEventListener('click', () => {
+        if (SRC.monthly === 'wing') { F.monthly.value = DEFAULTS.monthly; delete SRC.monthly; }
+        if (SRC.ret === 'wing') { F.ret.value = cat ? String(RgCalc.returnDefault(cat.p) * 100) : ''; delete SRC.ret; }
+        render();
+      });
       const tb = wingOut.querySelector('.rg-wing-tier');
-      if (tb) tb.addEventListener('click', () => {
-        if (tierOff) { tierIdx = fixTier; sizeMode = 'tier'; showDims(false); }
-        if (fixCat) choose(fixCat); else render();
-        (fixCat ? catField : sizeBlock).scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (tb) tb.addEventListener('click', () => { // commit exactly the previewed patch
+        if (patch.tierIdx != null) { tierIdx = patch.tierIdx; sizeMode = 'tier'; showDims(false); }
+        if (patch.cat) { cat = patch.cat; catAuto = false; catInput.value = cat.leaf; catInput.title = cat.p; close(); }
+        if (patch.ret != null) F.ret.value = patch.ret;
+        render();
+        (patch.cat ? catField : sizeBlock).scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     }
 

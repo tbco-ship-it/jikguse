@@ -241,7 +241,11 @@
     const orig = BizCalc.ORIGINS.find(o => o.k === origin.value);
     // 개당 원가(VAT 제외) = (과세가격 + 관세 + 과세 제외 부가서비스 안분) ÷ 수량 → 로켓그로스 계산기로 넘긴다
     const unitCost = l => (l.cif + l.duty + (r.cif ? r.brokerage * l.cif / r.cif : 0)) / (l.qty || 1);
-    const idOf = l => l.entry.c + ':' + l.price;
+    // slot id = HS:매입단가 (kept so existing saved slots survive); two sheet lines with the same pair get the 품명 appended so they
+    // stop sharing one 로켓그로스 slot (GPT-6 Pro review 2026-09-21)
+    const baseId = l => l.entry.c + ':' + l.price;
+    const dupIds = new Set(r.lines.map(baseId).filter((id, i, a) => a.indexOf(id) !== i));
+    const idOf = l => dupIds.has(baseId(l)) ? baseId(l) + ':' + (l.name || '') : baseId(l);
     const rows = r.lines.map(l => `<tr><th><span class="ln">${esc(l.name || nameOf(l.entry))}</span><small>${l.name ? esc(nameOf(l.entry)) + ' · ' : ''}${fmtHs(l.entry.c)} · ${l.qty.toLocaleString('ko-KR')} × ${l.price.toLocaleString('ko-KR')} ${cur}</small><small><button type="button" class="rg-link" data-id="${esc(idOf(l))}">개당 ${won(unitCost(l))} → 로켓그로스 수익 보기</button></small></th><td data-l="과세가격">${won(l.cif)}</td><td data-l="세율">${pct(l.rate.applied.rate)}<small>${esc(l.rate.applied.label)}</small></td><td data-l="관세">${won(l.duty)}</td><td data-l="부가세">${won(l.vat)}</td></tr>`).join('');
     const notes = [];
     if (input.co && r.ftaLines) notes.push(`협정세율 ${r.ftaLines}개 품목 — 수입신고 때 ${esc(orig.name)} 원산지증명서(C/O)를 제출해야 합니다. 원산지 기준(역내 부가가치·세번 변경)을 못 채우면 기본세율로 돌아갑니다.`);
