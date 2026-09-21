@@ -15,13 +15,13 @@
   const picked = {};
   function picker(input, list, labelOf, searchOf, initialSlug, onPick) {
     const menu = $(input.id + '-menu');
-    let items = [], active = -1;
+    let items = [], active = -1, query = '';
     const remembered = params.get(input.dataset.kind === 'items' ? 'item' : 'from') || localStorage.getItem('jikguse.' + input.dataset.kind);
     choose(list.find(x => x.slug === remembered) || list.find(x => x.slug === initialSlug) || list[0], false);
-    function choose(x, fire = true) { picked[input.dataset.kind] = x; input.value = labelOf(x); localStorage.setItem('jikguse.' + input.dataset.kind, x.slug); close(); onPick && onPick(x); if (fire) render(true); }
+    function choose(x, fire = true) { picked[input.dataset.kind] = x; input.value = labelOf(x); localStorage.setItem('jikguse.' + input.dataset.kind, x.slug); close(); onPick && onPick(x, fire ? query : undefined); query = ''; if (fire) render(true); }
     function rank(x, q) { const t = searchOf(x).map(norm); if (t.includes(q)) return 0; if (t.some(k => k.startsWith(q))) return 1; return 2; }
     function open(q) {
-      const nq = norm(q);
+      const nq = norm(q); query = q;
       items = (nq ? list.filter(x => searchOf(x).some(k => norm(k).includes(nq))).sort((a, b) => rank(a, nq) - rank(b, nq)) : list).slice(0, 8);
       menu.innerHTML = items.length ? items.map((x, i) => `<li role="option" data-i="${i}" ${i === active ? 'aria-selected="true"' : ''}>${labelOf(x)}</li>`).join('') : '<li class="empty">없는 항목이에요. 비슷한 품목을 골라 주세요.</li>';
       menu.hidden = false; input.setAttribute('aria-expanded', 'true');
@@ -41,10 +41,50 @@
     input.addEventListener('blur', () => setTimeout(() => { close(); const p = picked[input.dataset.kind]; if (p) input.value = labelOf(p); }, 120));
   }
 
+  // ----- price currency -----
+  // The price field is in the country's currency by default, but people who paid in won (AliExpress·Temu·Shein show
+  // won prices) shouldn't have to convert. Choices: country currency · USD · KRW. A manual pick sticks until the country changes.
+  const KRW_SHOPS = /알리|테무|쉬인|ali|temu|shein/i;
+  const SYM = { USD: '$', KRW: '', JPY: '¥', CNY: '¥', EUR: '€', GBP: '£', HKD: 'HK$', AUD: 'A$' };
+  const CUR_NAME = { USD: '달러', KRW: '원', JPY: '엔', CNY: '위안', EUR: '유로', GBP: '파운드', HKD: '홍콩달러', AUD: '호주달러' };
+  const RATE = c => c === 'KRW' ? 1 : FX[c];
+  const amt = (n, c) => c === 'KRW' ? Math.round(n).toLocaleString('ko-KR') + '원' : SYM[c] + n.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+  const curSel = $('cur');
+  let curOverride = null; // { slug, cur } — a currency the user picked, valid while the same country is selected
+  try { curOverride = JSON.parse(localStorage.getItem('jikguse.cur') || 'null'); } catch (e) { curOverride = null; }
+  const curOptions = country => [...new Set([country.currency, 'USD', 'KRW'])];
+  function currentCur(country) {
+    const opts = curOptions(country);
+    if (curOverride && curOverride.slug === country.slug && opts.includes(curOverride.cur)) return curOverride.cur;
+    return curOverride && curOverride.slug === country.slug && curOverride.def || country.currency;
+  }
+  // Country pick: "알리/테무/쉬인" → default KRW; any other shop or the country itself → the country currency. Clears a manual pick from another country.
+  function setCurDefault(country, typed) {
+    const def = KRW_SHOPS.test(typed || '') ? 'KRW' : country.currency;
+    curOverride = { slug: country.slug, def };
+    localStorage.setItem('jikguse.cur', JSON.stringify(curOverride));
+  }
+  function syncCurSelect(country) {
+    const cur = currentCur(country), opts = curOptions(country);
+    if (curSel.dataset.slug !== country.slug) { curSel.innerHTML = opts.map(c => `<option value="${c}">${c}</option>`).join(''); curSel.dataset.slug = country.slug; }
+    curSel.value = cur; $('cur2').textContent = cur;
+    return cur;
+  }
+  curSel.addEventListener('change', () => { const c = picked.countries; if (!c) return; curOverride = { slug: c.slug, def: curOverride && curOverride.slug === c.slug ? curOverride.def : c.currency, cur: curSel.value }; localStorage.setItem('jikguse.cur', JSON.stringify(curOverride)); render(true); });
+  // "$29.9", "32,000원", "¥3,000" typed into the price field flips the chip to match (only to a currency that is on offer).
+  function detectSymbol(text, country) {
+    const opts = curOptions(country); let c = null;
+    if (/원|₩/.test(text)) c = 'KRW';
+    else if (/US?\$|(^|[^A-Z])\$/.test(text)) c = 'USD';
+    else if (/¥|￥|円|元/.test(text)) c = opts.find(x => x === 'JPY' || x === 'CNY') || null;
+    else if (/€/.test(text)) c = 'EUR'; else if (/£/.test(text)) c = 'GBP';
+    return c && opts.includes(c) && c !== currentCur(country) ? c : null;
+  }
+
   // ----- tax model (mirror of scripts/model.py) -----
-  function compute(item, country, price, ship, fwd, fta, simplified) {
-    // 면세 판정 금액 = 물품가 + 현지 배송비 (국제운송비·보험료 제외) — 관세청 소액면세 기준
-    const cur = country.currency, priceK = price * FX[cur], shipK = ship * FX[cur];
+  function compute(item, country, price, ship, fwd, fta, simplified, cur = country.currency) {
+    // 면세 판정 금액 = 물품가 + 현지 배송비 (국제운송비·보험료 제외) — 관세청 소액면세 기준. cur = 입력 통화 (KRW 면 환율 1)
+    const priceK = price * RATE(cur), shipK = ship * RATE(cur);
     // 면세 판정은 센트 단위로: 원화 왕복 나눗셈은 $190.05+$9.95 를 200.00000000000003 로 만들어 한도 초과로 읽는다 (GPT-6 Pro 2026-09-21)
     const usd = cur === 'USD' ? Math.round((price + ship) * 100) / 100 : Math.round((priceK + shipK) / FX.USD * 100) / 100;
     const excluded = item.excluded;
@@ -77,7 +117,7 @@
       }
     }
     const tax = lines.reduce((s, [, v]) => s + v, 0);
-    return { exempt, partial, limit, usd, priceK, shipK, fwd, taxable, lines, tax, total: priceK + shipK + tax + fwd, method, ftaOk: ftaOk && !under, ftaPartial: ftaPartial && !under && method === 'general' && item.duty > 0, eff: (priceK + shipK) ? tax / (priceK + shipK) * 100 : 0 };
+    return { cur, exempt, partial, limit, usd, priceK, shipK, fwd, taxable, lines, tax, total: priceK + shipK + tax + fwd, method, ftaOk: ftaOk && !under, ftaPartial: ftaPartial && !under && method === 'general' && item.duty > 0, eff: (priceK + shipK) ? tax / (priceK + shipK) * 100 : 0 };
   }
 
 
@@ -120,16 +160,15 @@
   function render(scroll) {
     const item = picked.items, country = picked.countries;
     if (!item || !country) return;
-    // Currency labels follow the country even before a price is typed.
-    const cur = country.currency;
-    $('cur1').textContent = cur; $('cur2').textContent = cur;
+    // Currency chip follows the country (or the shop typed) even before a price is typed; the shipping label mirrors it.
+    const cur = syncCurSelect(country);
     // Landing: nothing is shown until a price is typed; the "type a price" placeholder sheet only appears once the page has opened up.
     if (document.documentElement.classList.contains('landing') && !num($('price'))) return;
     const first = document.documentElement.classList.contains('landing');
     leaveLanding();
     const price = num($('price')), ship = num($('ship')), fwd = num($('fwd')), fta = $('fta').checked, simp = $('simp').checked;
-    if (!price) { out.innerHTML = `<section class="sheet balanced quiet"><p class="sheet-label">예상 결제 총액</p><p class="sheet-title">가격을 넣으면 바로 계산됩니다</p><p class="sheet-text">${country.name} · ${item.name} · 면세 한도 미화 ${(country.courier200 && !item.excluded) ? 200 : 150}달러${cur === 'USD' ? '' : ` = ${country.symbol}${Math.round(((country.courier200 && !item.excluded) ? 200 : 150) * FX.USD / FX[cur]).toLocaleString('ko-KR')} (이번 주 과세환율)`}</p></section>`; return; }
-    const r = compute(item, country, price, ship, fwd, fta, simp);
+    if (!price) { out.innerHTML = `<section class="sheet balanced quiet"><p class="sheet-label">예상 결제 총액</p><p class="sheet-title">가격을 넣으면 바로 계산됩니다</p><p class="sheet-text">${country.name} · ${item.name} · 면세 한도 미화 ${(country.courier200 && !item.excluded) ? 200 : 150}달러${cur === 'USD' ? '' : ` = ${amt(Math.round(((country.courier200 && !item.excluded) ? 200 : 150) * FX.USD / RATE(cur)), cur)} (이번 주 과세환율)`}</p></section>`; return; }
+    const r = compute(item, country, price, ship, fwd, fta, simp, cur);
     const cls = r.exempt ? 'balanced' : r.eff > 60 ? 'severe' : r.eff > 20 ? 'moderate' : 'mild';
     let title, text;
     if (r.method === 'unsupported') { title = '담배는 아직 계산하지 않습니다'; text = '관세 40%에 개별소비세·담배소비세·지방교육세가 개비·그램 단위로 붙어 별도 확인이 필요합니다.'; }
@@ -141,21 +180,28 @@
       text = `물품가+현지 배송비 미화 ${r.usd.toFixed(0)}달러로 한도 ${r.limit}달러를 ${over.toFixed(0)}달러 넘어 전체가 과세됩니다. 과세가격 ${won(r.taxable)}${fwd ? ' (배대지 배송비 포함)' : ''}${r.ftaOk ? ' · FTA 적용으로 관세 0%' : ''}.${r.ftaPartial ? ` ${country.fta_name}는 품목별 잔존 관세가 있어 0%로 계산하지 않았습니다 — 관세율표의 협정세율을 확인하세요.` : ''}`;
     }
     const rows = r.lines.map(([n, v]) => `<tr><th>${n}</th><td>${won(v)}</td></tr>`).join('');
+    // Non-USD input: show the conversion the verdict rests on, and warn near the limit when the user paid in won (the mall's rate ≠ customs' rate).
+    let fxLine = '';
+    if (cur !== 'USD' && r.method !== 'unsupported') {
+      const edge = Math.abs(r.usd - r.limit) <= 10;
+      fxLine = `<p class="sheet-text fxline">${amt(price + ship, cur)} ≈ US$${r.usd.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} (과세환율 ${cur === 'KRW' ? `${Math.round(FX.USD).toLocaleString('ko-KR')}원/$` : `1${CUR_NAME[cur]} = ${RATE(cur).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}원`})${edge && cur === 'KRW' ? ' · 쇼핑몰 환율과 세관 환율이 달라 한도 근처에서는 결과가 바뀔 수 있어요' : ''}</p>`;
+    }
     let nearLimit = '';
     if (!r.exempt && !r.partial && r.method !== 'unsupported' && r.usd - r.limit < 30) {
-      const under = Math.floor(r.limit * FX.USD / FX[cur]);
+      const under = Math.floor(r.limit * FX.USD / RATE(cur));
       const saved = item.group === 'alcohol' ? r.lines.filter(([n]) => /관세|부가세/.test(n)).reduce((s, [, v]) => s + v, 0) : r.tax;
-      nearLimit = `<p class="sheet-text tip">한도를 ${(r.usd - r.limit).toFixed(0)}달러만 넘었습니다. 물품가를 ${country.symbol}${under.toLocaleString('ko-KR')} 아래로 맞추면 ${item.group === 'alcohol' ? `관세·부가세 ${won(saved)}이 빠집니다(주세·교육세는 남음)` : `세금 ${won(saved)}이 사라집니다`}.</p>`;
+      nearLimit = `<p class="sheet-text tip">한도를 ${(r.usd - r.limit).toFixed(0)}달러만 넘었습니다. 물품가를 ${amt(under, cur)} 아래로 맞추면 ${item.group === 'alcohol' ? `관세·부가세 ${won(saved)}이 빠집니다(주세·교육세는 남음)` : `세금 ${won(saved)}이 사라집니다`}.</p>`;
     }
     const actions = `<p class="sheet-actions"><a class="next" href="${base}items/${item.slug}/from/${country.slug}/">${country.name}에서 ${item.name} 직구 가이드</a><a class="next" href="https://www.coupang.com/np/search?q=${encodeURIComponent(item.name)}" rel="nofollow noopener" target="_blank">쿠팡 국내가와 비교</a></p>`;
-    out.innerHTML = `<section class="sheet ${cls}"><p class="sheet-label">예상 결제 총액</p><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>현지 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지 배송비</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
+    out.innerHTML = `<section class="sheet ${cls}"><p class="sheet-label">예상 결제 총액</p><div class="sheet-num"><span class="num">${Math.round(r.total).toLocaleString('ko-KR')}</span><span class="pct">원</span></div><p class="sheet-title">${title}</p><p class="sheet-text">${text}</p>${fxLine}${nearLimit}${rows ? `<table class="tbl spec mini"><tbody><tr><th>물품가</th><td>${won(r.priceK)}</td></tr><tr><th>현지 배송비</th><td>${won(r.shipK)}</td></tr>${rows}${fwd ? `<tr><th>배대지 배송비</th><td>${won(fwd)}</td></tr>` : ''}</tbody></table>` : ''}${actions}</section>`;
     document.querySelectorAll('.sheet-num .num').forEach(countUp);
     if (first) riseIn();
     if (scroll === true) bringIntoView(out);
   }
 
-  picker($('country'), D.countries, c => c.name, c => [c.name, c.currency, ...(c.shops || [])], 'us', () => { render(); });
+  picker($('country'), D.countries, c => c.name, c => [c.name, c.currency, ...(c.shops || [])], 'us', (c, typed) => { if (typed !== undefined) setCurDefault(c, typed); render(); });
   picker($('item'), D.items, i => i.name, i => [i.name, ...(i.aliases || [])], 'clothing');
+  $('price').addEventListener('input', () => { const c = picked.countries, hit = c && detectSymbol($('price').value, c); if (hit) { curOverride = { slug: c.slug, def: curOverride && curOverride.slug === c.slug ? curOverride.def : c.currency, cur: hit }; localStorage.setItem('jikguse.cur', JSON.stringify(curOverride)); } });
   ['price', 'ship', 'fwd'].forEach(id => { $(id).addEventListener('input', () => render(false)); $(id).addEventListener('change', () => { if (num($('price'))) render(true); }); });
   $('fta').addEventListener('change', () => render(true)); $('simp').addEventListener('change', () => render(true));
   if (params.get('price')) $('price').value = params.get('price');
