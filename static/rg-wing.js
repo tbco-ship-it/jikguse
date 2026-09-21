@@ -147,5 +147,23 @@
     return { rate: rates[0], tierIdx: tiers[0], units, cat };
   }
 
-  root.RgWing = { parse, diagnose, inferTier, inferFees };
+  // A 재고현황 item delivered by the 북마클릿 (static/wing-bm.js) in the same shape parse() returns, so diagnose()/the widget treat both
+  // sources alike. 매출 = gmv of the period box (Wing's 단품 × 표시가 sum); 단품·번들 split is not in the list API → null.
+  function fromItem(it) {
+    if (!it || !it.id) return null;
+    const box = b => ({ sold: b && b.sold != null ? b.sold : null, rev: b && b.gmv != null ? b.gmv : null, views: b && b.views != null ? b.views : null, single: null, bundle: null });
+    const w = { y: box(it.y), d7: box(it.d7), d30: box(it.d30),
+      stock: { avail: it.avail != null ? it.avail : null, availDays: it.doc != null && it.doc >= 0 ? it.doc : null, inbound: it.inbound != null ? it.inbound : null, recommend: it.rec && it.rec.qty > 0 ? it.rec.qty : null },
+      price: { list: it.price ? it.price.list : null, final: it.price ? it.price.final : null },
+      cost: { unit: it.cost ? it.cost.unit : null, storageMonth: it.cost ? it.cost.storageMonth : null },
+      // 반품률: returns received in the last 30 days ÷ units sold in the last 30 days (Wing's 월 figure is this month so far — 0% on the 3rd).
+      ret: it.ret30 != null && it.d30 && it.d30.sold > 0 ? { rate: Math.round(it.ret30 / it.d30.sold * 1000) / 10, month: null, note: `최근 30일 반품 ${it.ret30}건 ÷ 판매 ${it.d30.sold}개` }
+        : { rate: it.ret && it.ret.rate != null ? Math.round(it.ret.rate * 10) / 10 : null, month: it.ret ? it.ret.month : null },
+      name: [it.name, it.opt && it.opt !== '단일상품' ? it.opt : null].filter(Boolean).join(' · ').slice(0, 120) || null,
+      ids: [it.pid, it.id, it.iid].map(x => x != null ? String(x) : null),
+      series: it.series && it.series.u ? it.series.u : null, reg: it.reg || null, at: it.series && it.series.at || null };
+    return w;
+  }
+
+  root.RgWing = { parse, diagnose, inferTier, inferFees, fromItem };
 })(typeof window !== 'undefined' ? window : globalThis);

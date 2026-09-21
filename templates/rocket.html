@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}로켓그로스 순수익 계산기 — 판매수수료·입출고·배송·보관·반품비 빼고 개당 얼마 남나 | {{ site }}{% endblock %}
-{% block description %}쿠팡 로켓그로스 판매 순수익 계산기. 카테고리별 판매수수료, 사이즈별 입출고비·배송비, 보관비, 반품 회수·재입고비, 광고비를 빼고 개당 순이익·마진율·ROI·손익분기 판매가를 계산합니다. 낱개와 2·3·4묶음 비교.{% endblock %}
+{% block description %}쿠팡 로켓그로스 판매 순수익 계산기. 카테고리별 판매수수료, 사이즈별 입출고비·배송비, 보관비, 반품 회수·재입고비, 광고비를 빼고 개당 순이익·마진율·ROI·손익분기 판매가를 계산합니다. 윙 재고현황을 가져와 품절일·1688 발주 마감일까지. 낱개와 2·3·4묶음 비교.{% endblock %}
 {% block head %}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"{{ site }} 로켓그로스 순수익 계산기","applicationCategory":"FinanceApplication","operatingSystem":"Any","inLanguage":"ko","offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"},"url":"{{ origin }}{{ base }}rocket/"}</script>
 {% endblock %}
@@ -10,7 +10,15 @@
   <p>쿠팡 로켓그로스 판매자용. 카테고리별 판매수수료와 사이즈·판매가 구간별 입출고비·배송비, 보관비, 반품 회수·재입고비, 광고비까지 빼고 <strong>개당 순이익·마진율·ROI·손익분기 판매가</strong>를 보여 줍니다. 낱개와 2·3·4묶음도 한 줄씩 비교합니다. 요금표는 쿠팡 판매자센터 기준({{ rg.asof }}, 프로모션 {{ rg.promo_until }}까지).</p>
 </section>
 
-<section class="calc-grid biz-grid" id="rg-host" data-fees="{{ base }}static/rg_fees.json?v={{ rv }}" data-cats="{{ base }}static/rg_cats.json?v={{ rv }}" data-base="{{ base }}"></section>
+<section class="calc card rg-import" id="rg-import">
+  <div class="sub-row"><h2 class="card-title">윙에서 한 번에 가져오기 <small class="muted">(이미 파는 상품)</small></h2><span class="muted small" id="rg-import-at"></span></div>
+  <p class="muted small">파란 [윙 → 로켓그로스 계산기]를 <b>클릭 말고</b> 크롬 위쪽 북마크바로 끌어다 놓고(한 번만, 북마크바가 안 보이면 ⌘⇧B), 쿠팡 윙에 로그인된 탭에서 그 북마크를 누르세요. 로켓그로스 상품 전체의 <b>최근 1년 일별 판매량, 판매가능·입고중 재고, 판매가, 반품률, 쿠팡 예상 비용</b>을 읽어 이 페이지로 넘깁니다. 확장 프로그램 설치 아님, 서버 없음 — 데이터는 이 브라우저에만 저장됩니다.</p>
+  <div class="import-actions"><a id="rg-bm" class="bm" href="#" draggable="true" title="북마크바로 끌어다 놓으세요">윙 → 로켓그로스 계산기</a><button type="button" class="link-btn" id="rg-export">기록 내보내기</button><button type="button" class="link-btn" id="rg-import-btn">가져오기</button><input type="file" id="rg-import-file" accept="application/json,.json" hidden></div>
+  <p class="muted small" id="rg-import-note" hidden></p>
+  <div class="chips" id="rg-chips" role="tablist" aria-label="상품 선택" hidden></div>
+</section>
+
+<section class="calc-grid biz-grid" id="rg-host" data-fees="{{ base }}static/rg_fees.json?v={{ rv }}" data-cats="{{ base }}static/rg_cats.json?v={{ rv }}" data-base="{{ base }}" data-bm="{{ base }}static/wing-bm.js?v={{ v }}"></section>
 
 <div class="ad-slot"><!-- ad: rocket_below --></div>
 
@@ -21,11 +29,14 @@
   <p><strong>보관비</strong>는 입고 후 30일(의류·신발·악세서리 45일, 세이버 60일)까지 무료이고 그 뒤로는 부피(㎥)에 일 요율(31~60일 2,000원, 61~120일 2,500원, 121~180일 3,500원, 181일~ 5,000원)을 곱해 매일 쌓입니다. 옵션 1개의 하루 보관료를 반올림해서 계산하므로 극소형 상품은 하루 0원인 경우가 많습니다. <strong>반품</strong>이 나면 판매수수료·입출고·배송비는 청구되지 않지만 회수비(사이즈별)와 재입고비(판매가 구간별)가 붙고, 판매자당 월 20건까지는 무료입니다. 재판매가 어려운 반품은 원가를 잃고 반출비 300원이 듭니다.</p>
   <h2>묶음이 이득인 이유</h2>
   <p>입출고비는 판매 단위당, 배송비는 주문당 붙기 때문에 2개·3개 묶음으로 팔면 개당 물류비가 줄어듭니다. 대신 묶음 포장은 사이즈가 커져 상위 유형으로 올라갈 수 있고, 판매가 구간도 올라가므로 항상 이득은 아닙니다. 아래 비교표는 개별 치수(치수를 모르면 고른 유형의 대표 크기)로 묶음 포장 크기를 추정해 유형과 구간을 다시 매기고, 개당 순이익과 손익분기 판매가를 나란히 보여 줍니다.</p>
+  <h2>언제 품절되고, 언제 주문해야 하나</h2>
+  <p>이미 파는 상품은 위 북마클릿으로 윙 재고현황을 통째로 가져오면 상품마다 <strong>최근 1년 일별 판매량</strong>이 붙습니다. 계산기는 지난 7일·30일·90일 속도를 나란히 보여 주고, 지금 재고(판매가능 + 입고중)가 30일 속도로 언제 떨어지는지, 1688 주문부터 쿠팡 입고 완료까지 걸리는 리드타임(단계별 기본 25일)을 빼면 <strong>늦어도 언제 주문해야 하는지</strong>, 그때 몇 개를 주문해야 하는지를 계산합니다. 리드타임 기록장에 주문 건별 단계 날짜를 찍어 두면 진행 중인 주문이 예상 입고일에 재고로 잡히고, 3건 이상 쌓이면 실제 중앙값이 기본값을 대신합니다.</p>
   <h2>정산은 언제 들어오나</h2>
   <p>월정산은 월 판매마감일 + 20영업일에 100%, 주정산은 주 마감일 + 20영업일에 70%, 나머지 30%는 해당 월 익익월 첫 영업일에 들어옵니다. 세이버 가입자는 매월 500만원까지 수수료 없이 다음 날 90%를 받는 빠른정산을 쓸 수 있습니다.</p>
 </section>
 <script src="{{ base }}static/rg-calc.js?v={{ v }}" defer></script>
 <script src="{{ base }}static/rg-wing.js?v={{ v }}" defer></script>
+<script src="{{ base }}static/rg-stock.js?v={{ v }}" defer></script>
 <script src="{{ base }}static/rg-widget.js?v={{ v }}" defer></script>
 <script src="{{ base }}static/rg.js?v={{ v }}" defer></script>
 {% endblock %}

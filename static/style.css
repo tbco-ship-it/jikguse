@@ -696,3 +696,16 @@ html.landing .below{display:none}
 .rg-wing-out .sheet-actions .next.alt{white-space:normal;height:auto;min-height:48px;padding:12px 18px;line-height:1.3}
 .rg-card .num-in[readonly]{color:var(--muted);cursor:default}
 .field.wing>span:first-child::after{content:"윙 실적";display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:var(--green);color:#fff;font-size:.72rem;font-weight:800;letter-spacing:.02em;vertical-align:2px}
+/* 로켓그로스: 윙 가져오기 · 재고·발주 계획 · 리드타임 기록장 (2026-09-21) */
+.rg-import{margin:0 0 16px}.rg-import .import-actions{flex-direction:row;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}.rg-import .chips{margin:14px 0 0}.rg-import>.muted{max-width:72ch}
+#rg-import-note{margin:8px 0 0}#rg-import-note.neg{color:var(--red)}
+.calc-grid .rg-plan,.calc-grid .rg-log{grid-column:1/-1;margin-top:16px}.rg-plan>.muted,.rg-log>.muted{margin:0 0 10px;max-width:72ch}.rg-plan .card-title,.rg-log .card-title{margin-bottom:6px}
+.rg-plan .more{margin-top:14px}.rg-plan .row.stages .field>span:first-child{line-height:1.35}.rg-stage-src{display:block;font-weight:500}
+.rg-plan-out{margin-top:8px}.rg-plan-out:empty{display:none}.rg-plan-out .sheet{margin-top:12px}.rg-plan-out .sheet-num .num{font-size:clamp(26px,7vw,40px)}.rg-plan-out .sheet-num .pct{white-space:nowrap}.rg-plan-out .sheet-title{margin-top:.4em}
+.rg-plan-out .tbl.mini th{width:auto;text-align:left}.rg-plan-out .tbl.mini thead th{text-align:right;font-size:.82rem}.rg-plan-out .tbl.mini thead th:first-child{text-align:left}.rg-plan-out .tbl.mini td{white-space:nowrap;font-weight:700;padding-left:12px}.rg-plan-out .tbl.mini tr.on th,.rg-plan-out .tbl.mini tr.on td{color:var(--blue)}
+.bars{margin:16px 0 0}.bars svg{display:block;width:100%;max-width:480px;height:auto}.bars rect{fill:var(--blue);opacity:.85}.bars text{font-size:9px;fill:var(--muted);font-feature-settings:"tnum"}.bars text.ax{font-size:8.5px}.bars figcaption{margin-top:4px}
+.rg-log-list .empty{margin:6px 0 0}.order{margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}.order .num-in{background:var(--surface)}.order .money{background:var(--surface)}.order.mine .num-in,.order.mine .money{background:var(--bg)}.order.mine{border-color:var(--blue);background:var(--blue-soft)}
+.order-head{display:flex;gap:10px;align-items:center}.order-head .o-name{flex:1 1 auto;min-width:0}.order-head .money{flex:0 0 120px}.order-head .o-del{flex:none;padding:4px 0}
+.calc .order .row.dates{grid-template-columns:repeat(3,1fr);margin-top:10px;gap:10px}@media(max-width:560px){.calc .order .row.dates{grid-template-columns:1fr 1fr}.order-head{flex-wrap:wrap}.order-head .o-name{flex-basis:100%}}
+.order .row.dates .field>span{font-size:.82rem}.order .num-in[type=date]{min-height:44px;padding:10px 10px;font-size:.88rem;-webkit-appearance:none;appearance:none}.order .o-status{margin:8px 0 0}.rg-log-sum{margin:10px 0 0}
+@media(prefers-color-scheme:dark){.order.mine{background:rgba(49,130,246,.14)}}
