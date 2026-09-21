@@ -712,7 +712,7 @@ html.landing .below{display:none}
 /* 배송조회 (/track/): one input card, stepper in the headline sheet, two timeline cards (통관·배송) below it */
 .track-row{grid-template-columns:1.6fr 1fr}.calc-grid #track-form select{background-color:var(--surface)}@media(prefers-color-scheme:dark){.calc-grid #track-form select{background-color:var(--surface-2)}}@media(max-width:560px){.track-row{grid-template-columns:1fr}}
 .track-actions{margin:16px 0 8px}.track-actions .next{width:100%;border:0;font:inherit;cursor:pointer;background:var(--blue);color:#fff}.track-actions .next:disabled{opacity:.6;cursor:default}
-#track-form .chips{margin:12px 0 0}.chip.clear{color:var(--muted);font-weight:500}
+#track-form .chips{margin:12px 0 0}#track-form .chips[hidden]{display:none}.calc label small{line-height:1}.chip.clear{color:var(--muted);font-weight:500}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}.num-in.shake{animation:shake .3s;border-color:var(--red)}
 .stage .calc-grid #result{margin-top:16px}
 .steps{list-style:none;display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:22px 0 0;padding:0;counter-reset:s}
