@@ -40,6 +40,7 @@ def main():
     ap.add_argument("--origin", default="https://jikguse.com")
     ap.add_argument("--cname", default="jikguse.com")
     ap.add_argument("--adsense-pub", default="pub-8425563704095379")
+    ap.add_argument("--api", default="https://api.jikguse.com")  # jikguse-api Worker (worker/track-api.mjs) for /track/
     args = ap.parse_args()
     base = args.base if args.base.endswith("/") else args.base + "/"
     origin = args.origin.rstrip("/")
@@ -58,7 +59,7 @@ def main():
     env.filters["won_k"] = lambda n: won(round(n, -3))  # '약 155,000원' in titles — an exact-looking 155,016 next to '약' reads wrong
     env.filters["pct"] = lambda r: f"{r * 100:g}%"
     env.globals.update(site=SITE, base=base, origin=origin, today=date.today().isoformat(), v=v, hv=hv, rv=rv,
-                       adsense_pub=args.adsense_pub, items=items, countries=countries, fx=fx, rules=RULES,
+                       adsense_pub=args.adsense_pub, api=args.api.rstrip("/"), items=items, countries=countries, fx=fx, rules=RULES,
                        rg={"asof": rg["asof"], "promo_until": rg["promo_until"]})
 
     if DIST.exists():
@@ -80,6 +81,7 @@ def main():
     write("", "index.html")
     write("business/", "business.html")
     write("rocket/", "rocket.html")
+    write("track/", "track.html")
     for page in ("about", "methodology", "privacy", "contact"):
         write(f"{page}/", f"{page}.html")
     for g in ("list-clearance", "combined-tax", "fx", "fta"):

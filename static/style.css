@@ -709,3 +709,26 @@ html.landing .below{display:none}
 .calc .order .row.dates{grid-template-columns:repeat(3,1fr);margin-top:10px;gap:10px}@media(max-width:560px){.calc .order .row.dates{grid-template-columns:1fr 1fr}.order-head{flex-wrap:wrap}.order-head .o-name{flex-basis:100%}}
 .order .row.dates .field>span{font-size:.82rem}.order .num-in[type=date]{min-height:44px;padding:10px 10px;font-size:.88rem;-webkit-appearance:none;appearance:none}.order .o-status{margin:8px 0 0}.rg-log-sum{margin:10px 0 0}
 @media(prefers-color-scheme:dark){.order.mine{background:rgba(49,130,246,.14)}}
+/* 배송조회 (/track/): one input card, stepper in the headline sheet, two timeline cards (통관·배송) below it */
+.track-row{grid-template-columns:1.6fr 1fr}.calc-grid #track-form select{background-color:var(--surface)}@media(prefers-color-scheme:dark){.calc-grid #track-form select{background-color:var(--surface-2)}}@media(max-width:560px){.track-row{grid-template-columns:1fr}}
+.track-actions{margin:16px 0 8px}.track-actions .next{width:100%;border:0;font:inherit;cursor:pointer;background:var(--blue);color:#fff}.track-actions .next:disabled{opacity:.6;cursor:default}
+#track-form .chips{margin:12px 0 0}.chip.clear{color:var(--muted);font-weight:500}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}.num-in.shake{animation:shake .3s;border-color:var(--red)}
+.stage .calc-grid #result{margin-top:16px}
+.steps{list-style:none;display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:22px 0 0;padding:0;counter-reset:s}
+.steps li{position:relative;text-align:center;font-size:.78rem;font-weight:600;color:var(--muted)}
+.steps li::before{content:"";position:absolute;top:7px;left:-50%;right:50%;height:2px;background:var(--line)}.steps li:first-child::before{display:none}
+.steps .dot{display:block;width:16px;height:16px;margin:0 auto 6px;border-radius:50%;background:var(--bg);border:2px solid var(--line);position:relative;z-index:1;box-sizing:border-box}
+.steps li.done::before,.steps li.now::before{background:var(--blue)}.steps li.done .dot{background:var(--blue);border-color:var(--blue)}.steps li.done{color:var(--text-2)}
+.steps li.now .dot{border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-soft)}.steps li.now{color:var(--blue)}
+.sheet.balanced .steps li.done::before,.sheet.balanced .steps li.done .dot,.sheet.balanced .steps li.now::before{background:var(--green);border-color:var(--green)}.sheet.balanced .steps li.now{color:var(--green)}.sheet.balanced .steps li.now .dot{border-color:var(--green);box-shadow:0 0 0 4px rgba(0,0,0,.05)}
+@media(max-width:560px){.steps li{font-size:.7rem}.steps .lbl{display:block;word-break:keep-all}}
+.result>.card.tl.rv{filter:none}.card.tl{margin-top:14px;background:var(--bg);border:1px solid var(--line);box-shadow:0 1px 2px rgba(25,31,40,.02),0 4px 16px rgba(25,31,40,.05)}.card.tl .card-title{margin-bottom:6px}.card.tl .card-title small{font-size:.8rem;font-weight:500;margin-left:6px}
+.card.tl .meta{margin:0 0 14px}.pill.ok{background:var(--green-soft);color:var(--green)}
+.tl-list{list-style:none;margin:0;padding:0}.tl-list li{display:grid;grid-template-columns:82px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line);position:relative}.tl-list li:first-child{border-top:0;padding-top:4px}
+.tl-list .when{color:var(--muted);font-size:.85rem;font-feature-settings:"tnum";padding-top:2px;white-space:nowrap}.tl-list .what b{font-weight:700}.tl-list li.now .what b{color:var(--blue)}.tl-list .what .small{margin-top:2px;line-height:1.45}
+.tl-list .why,.gloss dd{margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--surface);color:var(--text-2);font-size:.9rem;line-height:1.5}.nx{display:block;margin-top:4px;color:var(--text)}
+.tl-list li:not(.now) .what b{color:var(--text-2)}
+.fetched{margin:12px 0 0;text-align:center}.link-btn{border:0;background:none;padding:0;font:inherit;color:var(--blue);font-weight:600;cursor:pointer}
+.gloss{margin:16px 0 0}.gloss>div{margin-top:14px}.gloss dt{font-weight:700}.gloss dd{margin-left:0;margin-top:6px}
+@media(prefers-color-scheme:dark){.card.tl{background:var(--surface)}.tl-list .why,.gloss dd{background:var(--surface-2)}.steps .dot{background:var(--surface)}.pill.ok{background:rgba(52,199,89,.16)}}

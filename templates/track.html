@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}해외직구 배송조회 — 송장번호 하나로 통관 단계부터 CJ대한통운 배송까지 | {{ site }}{% endblock %}
+{% block description %}직구 송장번호(H B/L)를 넣으면 관세청 통관 진행(적하목록·입항·반입·수입신고·반출)과 CJ대한통운·한진·롯데 등 국내 택배 배송 현황을 한 화면에 보여줍니다. 각 단계가 무슨 뜻이고 보통 얼마나 걸리는지도 함께.{% endblock %}
+{% block head %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"{{ site }} 해외직구 배송조회","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","inLanguage":"ko","offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"},"url":"{{ origin }}{{ base }}track/"}</script>
+<script>if(!/(^|[#&?])no=/.test(location.hash+location.search))document.documentElement.classList.add('landing')</script>
+{% endblock %}
+{% block content %}
+<div class="stage" id="stage">
+<section class="hero">
+  <h1>내 직구, 지금 어디쯤일까요?</h1>
+  <p>송장번호 하나면 됩니다. 관세청 통관 단계와 국내 택배 배송을 한 줄로 이어서 보여 주고, 각 단계가 무슨 뜻인지·보통 얼마나 걸리는지도 알려 드려요.</p>
+</section>
+
+<section class="calc-grid">
+<form class="calc card" id="track-form" data-api="{{ api }}" data-base="{{ base }}">
+  <h2 class="card-title">송장번호를 넣어 주세요</h2>
+  <div class="row track-row">
+    <label class="field">송장번호 <small class="muted">(H B/L)</small>
+      <input id="no" class="num-in" type="text" inputmode="numeric" autocomplete="off" placeholder="307786405384" spellcheck="false">
+    </label>
+    <label class="field">택배사
+      <select id="carrier"></select>
+    </label>
+  </div>
+  <div class="chips" id="recent" aria-label="최근 조회" hidden></div>
+  <p class="sheet-actions track-actions"><button type="submit" class="next" id="go">조회</button></p>
+  <p class="muted small">배대지·특송업체 안내 문자에 적힌 번호를 그대로 넣으면 됩니다. 번호는 저장하지 않고 조회에만 씁니다(최근 조회 목록은 이 기기에만). 통관 정보는 관세청 UNI-PASS, 배송 정보는 택배사 공개 조회 기준이며 10분 간격으로 갱신됩니다.</p>
+</form>
+<div id="result" class="result" aria-live="polite"></div>
+</section>
+</div>
+
+<div class="below" id="below">
+<div class="ad-slot"><!-- ad: track_below --></div>
+
+<section class="prose">
+  <h2>직구 물건이 오는 길</h2>
+  <p>해외 판매처(또는 배대지)에서 출발한 물건은 <strong>배·항공기 도착 → 세관 보세창고 반입 → 통관 심사 → 반출 → 국내 택배</strong> 순서로 옵니다. 특송·해상특송으로 오는 직구는 통관목록의 번호(H B/L)가 그대로 국내 택배 송장번호가 되는 경우가 많아, 번호 하나로 두 구간을 다 볼 수 있습니다. 통관이 끝나기 전에는 택배사 조회에 "정보 없음"으로 뜨는 게 정상이에요.</p>
+  <h2>세금은 언제 붙나요</h2>
+  <p>물품 가격이 미화 150달러(미국발 특송 200달러) 이하인 자가사용 물품은 <strong>목록통관</strong>으로 세금 없이 끝납니다. 한도를 넘거나 목록통관 제외 품목(건강기능식품·의약품·주류 등)이면 <strong>수입신고</strong> 단계가 나오고, 이때 관세·부가세가 고지됩니다. 수입신고 단계가 보이면 <a href="{{ base }}">직구세 계산기</a>로 예상 세액을 미리 확인해 두세요. 같은 날 같은 판매자 물품이 묶이면 <a href="{{ base }}guide/combined-tax/">합산과세</a>로 한도를 넘길 수 있습니다.</p>
+  <h2 id="glossary-h">통관 단계, 이런 뜻입니다</h2>
+  <div id="glossary"></div>
+</section>
+</div>
+<script src="{{ base }}static/track-model.js?v={{ v }}" defer></script>
+<script src="{{ base }}static/track.js?v={{ v }}" defer></script>
+{% endblock %}
