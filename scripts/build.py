@@ -101,7 +101,9 @@ def main():
 
     sm = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for u in urls:
-        sm.append(f"<url><loc>{origin}{base}{u}</loc><lastmod>{date.today().isoformat()}</lastmod></url>")
+        # lastmod 없음: 빌드일은 내용이 바뀐 날이 아니다. 구글은 lastmod 가 "consistently and
+        # verifiably accurate" 할 때만 쓴다(sitemaps/build-sitemap).
+        sm.append(f"<url><loc>{origin}{base}{u}</loc></url>")
     sm.append("</urlset>")
     (DIST / "sitemap.xml").write_text("\n".join(sm))
     (DIST / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {origin}{base}sitemap.xml\n")
