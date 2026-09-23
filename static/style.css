@@ -735,3 +735,13 @@ html.landing .below{display:none}
 /* home: one-tap shop chips under "어디서 사나요" — picking a shop picks its country (and KRW for 알리·테무·쉬인) */
 .calc .row .shop-chips{grid-column:1/-1;margin:-2px 0 0;gap:6px}.shop-chips .chip{padding:6px 11px;border-radius:999px;font-size:.84rem;font-weight:600}
 @media(max-width:560px){.calc .row .shop-chips{order:1;margin:0}.calc .row:has(.shop-chips) .field:nth-child(2){order:2}}
+/* 명절 택배 표: 글이 긴 4열이라 오른쪽 정렬을 풀고, 좁은 화면에선 택배사별 카드로 쌓는다 */
+.hd-tbl td,.hd-tbl th{vertical-align:top}
+.hd-tbl tbody td{white-space:normal;font-weight:500;color:var(--text-2)}.hd-tbl tbody td:first-child{min-width:7em}
+.hd-tbl td:last-child,.hd-tbl th:last-child{text-align:left}
+@media (max-width:640px){
+  .hd-tbl thead{display:none}
+  .hd-tbl tr{display:block;padding:12px 0;border-bottom:1px solid var(--line)}
+  .hd-tbl td{display:block;border:none;padding:4px 0}
+  .hd-tbl td[data-l]::before{content:attr(data-l);display:block;color:var(--muted);font-size:.8rem;font-weight:600}
+}

@@ -1,0 +1,23 @@
+{
+  "holiday": "2026 추석",
+  "day": "2026-09-25",
+  "span": ["2026-09-24", "2026-09-27"],
+  "span_note": "9/24(목)~9/26(토) 추석 연휴 + 9/27 일요일, 4일. 9/26 이 토요일과 겹치지만 설·추석은 일요일과 겹칠 때만 대체공휴일이 생겨 이번엔 없습니다.",
+  "span_src": {"label": "우주항공청 2026년 월력요항", "url": "https://www.kasa.go.kr/bbs/BBSMSTR_000000000010/view.do?nttId=B000000001860Pe2zT3"},
+  "checked": "2026-09-23",
+  "carriers": [
+    {"name": "CJ대한통운", "cutoff": "일반 9/22(화), 제주·도서 9/21(월)", "stop": "9/23 허브터미널 중단, 9/24~26 휴무", "resume": "9/26(토) 서브터미널 배송부터, 9/27(일) 반품·계약고객 집화, 9/28(월) 편의점 접수", "resume_date": "2026-09-26", "kind": "보도", "src": {"label": "물류신문 9/9", "url": "https://www.klnews.co.kr/news/articleView.html?idxno=322650"}},
+    {"name": "한진택배", "cutoff": "개인 예약(앱·홈페이지·전화) 9/18(금)부터 중지. 원클릭 집하 신선 9/21 15시, 상온 9/22 15시", "stop": "9/24~26 휴무", "resume": "원클릭 9/28(월), 취급점·무인택배함 9/29(화), 개인 예약 9/30(수)", "resume_date": "2026-09-28", "kind": "공식", "src": {"label": "한진 공지 9/8", "url": "https://www.hanjin.com/kor/CMS/Board/Board.do?mCode=MN043&mode=view&mgr_seq=1&board_seq=1508"}},
+    {"name": "롯데택배", "cutoff": "일반 9/22(화), 식품류·제주 9/21(월), 주7일 배송 집화 9/23(수)", "stop": "9/24~26 휴무", "resume": "9/27(일) 일반 집화·주7일 배송 재개", "resume_date": "2026-09-27", "kind": "보도", "src": {"label": "물류신문 9/9", "url": "https://www.klnews.co.kr/news/articleView.html?idxno=322650"}},
+    {"name": "우체국택배", "cutoff": "방문소포(EMS 포함) 접수 9/15~9/29 중지, 같은 기간 생물·신선식품 접수 제한", "stop": "9/15부터 일부 지역 소포 배송 지연 안내", "resume": "방문소포 접수 9/30(수)부터 (중지 기간이 9/29 까지)", "resume_date": "2026-09-30", "kind": "공식", "src": {"label": "우체국 안내 9/17", "url": "https://www.epost.go.kr/main.retrieveMainPopupDetail.comm?seqno=881"}},
+    {"name": "쿠팡 로켓배송", "cutoff": "없음", "stop": "쉬지 않음 (연휴 3일 모두 배송)", "resume": "—", "resume_date": null, "kind": "보도", "note": "외부 택배로 보내는 입점 판매자 상품은 연휴 중 배송이 안 될 수 있음", "src": {"label": "물류신문 9/9", "url": "https://www.klnews.co.kr/news/articleView.html?idxno=322650"}},
+    {"name": "GS25 편의점택배", "cutoff": "일반택배 수거 9/23(수), 제주·도서 9/22(화)", "stop": "일반택배 연휴 중 중단. 반값택배는 연휴에도 운영", "resume": "9/27(일) 배송, 9/28(월) 수거", "resume_date": "2026-09-27", "kind": "보도", "src": {"label": "뉴스웨이 9/18", "url": "https://newsway.co.kr/news/view?ud=2026091814135474254"}},
+    {"name": "세븐일레븐 편의점택배", "cutoff": "9/21(월) 수도권 17시, 그 외 15시", "stop": "연휴 중 중단", "resume": "9/28(월)부터 배송", "resume_date": "2026-09-28", "kind": "보도", "src": {"label": "위키트리 9/17", "url": "https://www.wikitree.co.kr/articles/1160202"}}
+  ],
+  "unknown": "로젠·경동·대신택배와 CU 편의점택배는 올해 추석 공지를 찾지 못했습니다. 지점마다 다르다는 보도만 있어 해당 지점에 직접 확인하세요.",
+  "customs": {
+    "text": "관세청은 9/7(월)~9/27(일) 전국 34개 세관에서 공휴일·야간을 포함한 24시간 특별통관지원팀을 운영하고, 인천·평택·군산·용당·김포공항세관에는 해외직구 특송물품 특별통관지원팀을 둡니다. 연휴 기간 전체가 이 안에 들어갑니다.",
+    "src": {"label": "관세청 보도자료 9/4", "url": "https://www.customs.go.kr/kcs/na/ntt/selectNttInfo.do?mi=2891&bbsId=1362&nttSn=10175786"}
+  },
+  "next": {"name": "2027 설", "span": "2/6(토)~2/9(화), 설날 2/7(일), 2/9 대체공휴일", "src": {"label": "우주항공청 2027년 월력요항", "url": "https://www.kasa.go.kr/prog/plcyBrf/brief/kor/sub01_01_04/view.do?plcyBrfNo=431"}}
+}

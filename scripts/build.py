@@ -90,6 +90,7 @@ def main():
         write(f"{page}/", f"{page}.html")
     for g in ("list-clearance", "combined-tax", "fx", "fta"):
         write(f"guide/{g}/", f"guide_{g}.html")
+    write("guide/holiday-delivery/", "guide_holiday-delivery.html", holiday_delivery=json.loads((ROOT / "data/holiday_delivery.json").read_text()))
 
     write("items/", "items_index.html")
     for it in items:
