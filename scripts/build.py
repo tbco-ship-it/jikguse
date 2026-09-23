@@ -82,7 +82,7 @@ def main():
     write("business/", "business.html")
     write("rocket/", "rocket.html")
     write("track/", "track.html")
-    for page in ("about", "methodology", "privacy", "contact"):
+    for page in ("about", "methodology", "privacy", "terms", "contact"):
         write(f"{page}/", f"{page}.html")
     for g in ("list-clearance", "combined-tax", "fx", "fta"):
         write(f"guide/{g}/", f"guide_{g}.html")
