@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}해외직구 배송조회 — 송장번호 하나로 통관 단계부터 CJ대한통운 배송까지 | {{ site }}{% endblock %}
+{% block title %}직구 통관 조회·배송조회 — 송장번호 하나로 관세청 통관 단계부터 택배 도착까지 | {{ site }}{% endblock %}
 {% block description %}직구 송장번호(H B/L)를 넣으면 관세청 통관 진행(적하목록·입항·반입·수입신고·반출)과 CJ대한통운·한진·롯데 등 국내 택배 배송 현황을 한 화면에 보여줍니다. 각 단계가 무슨 뜻이고 보통 얼마나 걸리는지도 함께.{% endblock %}
 {% block head %}
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"{{ site }} 해외직구 배송조회","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","inLanguage":"ko","offers":{"@type":"Offer","price":"0","priceCurrency":"KRW"},"url":"{{ origin }}{{ base }}track/"}</script>
@@ -9,7 +9,7 @@
 <div class="stage" id="stage">
 <section class="hero">
   <h1>내 직구, 지금 어디쯤일까요?</h1>
-  <p>송장번호 하나면 됩니다. 관세청 통관 단계와 국내 택배 배송을 한 줄로 이어서 보여 주고, 각 단계가 무슨 뜻인지·보통 얼마나 걸리는지도 알려 드려요.</p>
+  <p>송장번호 하나면 됩니다. 관세청 통관 조회와 국내 택배 배송을 한 줄로 이어서 보여 주고, 각 단계가 무슨 뜻인지·보통 얼마나 걸리는지도 알려 드려요.</p>
 </section>
 
 <section class="calc-grid">
