@@ -17,7 +17,8 @@
 <p class="muted small">과세환율 1 {{ country.currency }} = {{ fx.rates[country.currency] }}원 ({{ fx.applies_from }}~{{ fx.applies_to }}), 해외 배송비 약 $25 가정. 배대지 요금 별도.</p>
 {% for e in ex %}{% include "_result.html" %}{% endfor %}
 
-<p class="sheet-actions"><a class="next" href="{{ base }}?item={{ item.slug }}&from={{ country.slug }}">내 가격으로 계산하기</a></p>
+<p class="sheet-actions"><a class="next" href="{{ base }}?item={{ item.slug }}&from={{ country.slug }}">내 가격으로 계산하기</a>{% if item.cp %}<a class="next" href="{{ item.cp.link }}" rel="sponsored nofollow noopener" target="_blank">쿠팡 국내가와 비교</a>{% endif %}</p>
+{% if item.cp %}<p class="muted small cp-note">이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>{% endif %}
 
 <h2>{{ country.name }} 직구에서 자주 쓰는 쇼핑몰</h2>
 <p class="prose">{{ country.shops|join(', ') }}. 판매자마다 발송 방식(특송/우편)이 달라 한도가 바뀔 수 있습니다.</p>

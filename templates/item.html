@@ -24,7 +24,8 @@
 <div class="sec"><div class="sec-h"><h2>다른 나라에서 살 때</h2></div>
 <ul class="list">{% for c in countries %}<li><a href="{{ base }}items/{{ item.slug }}/from/{{ c.slug }}/">{{ c.name }}에서 {{ item.name }}<span class="meta">{{ c.currency }} · {% if c.fta %}FTA{% else %}FTA 없음{% endif %}</span></a></li>{% endfor %}</ul></div>
 
-<p class="sheet-actions"><a class="next" href="{{ base }}?item={{ item.slug }}">{{ item.name }} 가격 넣고 계산하기</a></p>
+<p class="sheet-actions"><a class="next" href="{{ base }}?item={{ item.slug }}">{{ item.name }} 가격 넣고 계산하기</a>{% if item.cp %}<a class="next" href="{{ item.cp.link }}" rel="sponsored nofollow noopener" target="_blank">쿠팡 국내가와 비교</a>{% endif %}</p>
+{% if item.cp %}<p class="muted small cp-note">이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</p>{% endif %}
 
 <div class="ad-slot"><!-- ad: item_mid --></div>
 <div class="sec"><div class="sec-h"><h2>함께 보는 품목</h2><a href="{{ base }}items/">전체</a></div>

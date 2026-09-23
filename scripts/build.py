@@ -18,6 +18,10 @@ SITE = "직구세"
 
 def load():
     items = json.loads((ROOT / "data/items.json").read_text())
+    cp = json.loads((ROOT / "data/coupang.json").read_text())
+    for it in items:
+        if it["slug"] in cp:
+            it["cp"] = cp[it["slug"]]
     countries = json.loads((ROOT / "data/countries.json").read_text())
     fx = json.loads((ROOT / "data/fx.json").read_text())
     return items, countries, fx
