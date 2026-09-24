@@ -30,6 +30,8 @@ def load():
 def examples(item, country, fx):
     """Three worked examples at low/mid/high USD-equivalent prices, in shop currency."""
     out = []
+    if item["group"] == "tobacco":  # 담배 세액은 계산하지 않음 — 0원 예시를 만들지 않는다
+        return out
     usd_rate = fx["rates"]["USD"] / fx["rates"][country["currency"]]
     for usd in item["ex"]:
         price = round(usd * usd_rate, -1 if country["currency"] in ("JPY",) else 0)

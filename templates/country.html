@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{{ country.name }} 직구 관세 총정리 — 면세 한도 {{ country.currency }} 환산, FTA, 품목별 세율 (2026) | {{ site }}{% endblock %}
-{% block description %}{{ country.name }} 해외직구 관세: 면세 한도를 이번 주 과세환율로 {{ country.currency }} 환산, {{ country.fta_name }} 적용 조건, 자주 사는 품목별 세율과 예상 세금.{% endblock %}
+{% block title %}{% if country.courier200 %}{{ country.name }} 직구 관세: 특송 $200(영양제·식품 $150)까지 면세 (2026){% elif country.seo_head %}{{ country.name }} {{ country.seo_head }}: $150={{ country.symbol }}{{ "{:,}".format(limit_local|int) }} (이번 주 환율){% else %}{{ country.name }} 직구 관세: $150={{ country.symbol }}{{ "{:,}".format(limit_local|int) }}까지 면세 (이번 주 환율){% endif %} | {{ site }}{% endblock %}
+{% block description %}{% if country.courier200 %}{{ country.name }}에서 산 물품값+현지 배송비가 200달러(특송 목록통관) 이하면 면세. 우체국 배송과 영양제·식품·기능성 화장품은 150달러, 넘으면 전액 과세.{% else %}{{ country.name }}에서 산 물품값+현지 배송비가 {{ country.symbol }}{{ "{:,}".format(limit_local|int) }}(미화 150달러) 이하면 면세, 넘으면 전액 과세.{% endif %} {{ country.desc_fta }} 이번 주 관세청 과세환율 기준.{% endblock %}
 {% block content %}
 <nav class="crumbs"><a href="{{ base }}">홈</a> › <a href="{{ base }}from/">나라별</a> › {{ country.name }}</nav>
 <h1>{{ country.name }} 직구 관세</h1>
 <section class="sheet balanced">
   <div class="sheet-num"><span class="num">{{ country.symbol }}{{ "{:,}".format(limit_local|int) }}</span></div>
   <p class="sheet-title">이번 주 면세 한도 (미화 150달러)</p>
-  <p class="sheet-text">과세환율 1 {{ country.currency }} = {{ fx.rates[country.currency] }}원 ({{ fx.applies_from }}~{{ fx.applies_to }}).{% if country.courier200 %} 특송으로 오는 목록통관 물품은 200달러 = {{ country.symbol }}{{ "{:,}".format(limit200_local|int) }}까지 면세.{% endif %} 건강기능식품·식품·주류·기능성 화장품은 어디서 오든 150달러.</p>
+  <p class="sheet-text">과세환율 1 {{ country.currency }} = {{ fx.rates[country.currency] }}원 ({{ fx.applies_from }}~{{ fx.applies_to }}).{% if country.courier200 %} 특송으로 오는 목록통관 물품은 200달러 = {{ country.symbol }}{{ "{:,}".format(limit200_local|int) }}까지 면세.{% endif %} 물품값에는 현지 배송비·현지 세금이 들어가고 국제 배송비는 빠집니다. 한도를 넘으면 넘은 만큼이 아니라 전액에 과세합니다. 건강기능식품·식품·기능성 화장품은 어디서 오든 150달러. 주류는 150달러 이하여도 주세·교육세를 냅니다.</p>
 </section>
 <div class="ad-slot"><!-- ad: country_top --></div>
 <div class="prose">
@@ -18,5 +18,5 @@
 </div>
 <h2>품목별 예상 세금</h2>
 <table class="tbl"><thead><tr><th>품목</th><th>통관</th><th>과세 시 세율</th><th></th></tr></thead>
-<tbody>{% for it in items %}<tr><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">{{ it.name }}</a></td><td>{{ '일반통관' if it.excluded else '목록통관' }}</td><td>{% if it.group == 'alcohol' %}관세 {{ it.duty|pct }} + 주세·교육세·부가세{% elif it.group == 'tobacco' %}별도 계산{% elif it.slug in rules.vat_exempt_items %}관세 0% · 부가세 면제{% elif it.duty == 0 %}부가세 10%{% else %}관세 {{ it.duty|pct }} + 부가세{% if country.fta %} · FTA 시 10%{% endif %}{% endif %}</td><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">계산</a></td></tr>{% endfor %}</tbody></table>
+<tbody>{% for it in items %}<tr><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">{{ it.name }}</a></td><td>{{ '일반통관' if it.excluded else '목록통관' }}</td><td>{% if it.group == 'alcohol' %}관세 {{ it.duty|pct }} + 주세·교육세·부가세{% elif it.group == 'tobacco' %}별도 계산{% elif it.slug in rules.vat_exempt_items %}관세 0% · 부가세 면제{% elif it.duty == 0 %}부가세 10%{% else %}관세 {{ it.duty|pct }} + 부가세{% if country.fta and country.fta_zero is not false %}{% if it.slug in ['supplements','food','probiotics','omega3','protein-powder','minerals','collagen'] %} (FTA 세율은 품목별){% else %} (FTA 원산지면 관세 0%){% endif %}{% endif %}{% endif %}</td><td><a href="{{ base }}items/{{ it.slug }}/from/{{ country.slug }}/">계산</a></td></tr>{% endfor %}</tbody></table>
 {% endblock %}

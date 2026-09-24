@@ -48,10 +48,11 @@ def compute(item, country, price, shipping, fx, *, method=None, fta=False, couri
         vat = 0.0 if exempt else (taxable + duty + liquor + edu) * RULES["vat"]
         lines = [("관세", duty, 0.0 if (exempt or fta_ok) else a["duty"]), ("주세", liquor, a["liquor"]), ("교육세", edu, a["edu"]), ("부가세", vat, 0.0 if exempt else RULES["vat"])]
         method_used = "alcohol_exempt_partial" if exempt else "alcohol"
+    elif item["group"] == "tobacco":  # 한도 이내여도 담배소비세·개별소비세 과세 — calc.js 와 같은 순서
+        method_used = "unsupported"
+        exempt = False
     elif exempt:
         method_used = "exempt"
-    elif item["group"] == "tobacco":
-        method_used = "unsupported"
     else:
         taxable = price_krw + ship_krw + forwarder_krw  # 과세가격 = 물품가 + 현지 배송비 + 국제운송비(배대지 배송비)
         use_simplified = (method == "simplified" and item["duty"] > 0 and not fta_ok and taxable <= RULES["simplified_cap_krw"])
