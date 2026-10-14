@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}2026 광군제·블랙프라이데이 직구 관세 — 면세한도·관부가세 계산 | {{ site }}{% endblock %}
+{% block description %}광군제·블랙프라이데이 세일가로 직구할 때의 관세와 부가세 예시, 미국발 특송 200달러·일반 150달러 면세 기준, 목록통관 배제 품목과 합산과세 요건을 정리했습니다.{% endblock %}
+{% block content %}
+<h1>2026 광군제·블랙프라이데이 직구 관세 계산</h1>
+<div class="prose">
+<p>광군제(11월 11일)와 블랙프라이데이(2026년 11월 27일) 할인은 상품가를 낮추지만, 통관 때 붙는 관세와 부가세까지 자동으로 사라지지는 않습니다. 세일을 적용한 상품가와 현지 배송료, 어느 나라에서 어떤 방식으로 들어오는지를 함께 확인해야 실제 비용을 가늠할 수 있습니다.</p>
+<p>아래 예시는 직구세 계산기에 의류 가격을 넣은 값입니다. 적용 환율은 2026년 10월 11일~17일 관세청 과세환율인 1달러 1,347.03원, 1위안 200.90원입니다. 신고 주간이 달라지면 과세환율도 달라질 수 있습니다.</p>
+
+<h2>세일가를 넣었을 때 관부가세 예시</h2>
+<p>세 예시 모두 현지 배송료와 국제 배송료를 0원으로 입력하고, FTA와 간이세율은 끈 상태입니다. 의류 기본 관세율은 계산기 품목 설정인 13%를 적용합니다.</p>
+<table class="tbl compact">
+<thead><tr><th>구매 상황</th><th>면세 기준 판정</th><th>예상 세금</th><th>배송료 제외 합계</th></tr></thead>
+<tbody>
+<tr><td data-l="구매 상황">미국발 특송 · US$180</td><td data-l="면세 기준 판정">US$200 이하</td><td data-l="예상 세금">0원</td><td data-l="배송료 제외 합계">약 242,465원</td></tr>
+<tr><td data-l="구매 상황">미국발 특송 · US$230</td><td data-l="면세 기준 판정">US$200 초과<br><small>상품가 전체 과세</small></td><td data-l="예상 세금">약 75,286원<br><small>관세 40,276원 + 부가세 35,009원</small></td><td data-l="배송료 제외 합계">약 385,102원</td></tr>
+<tr><td data-l="구매 상황">중국발 · CNY 1,000 (¥1,000)</td><td data-l="면세 기준 판정">약 US$149.14<br><small>US$150 이하</small></td><td data-l="예상 세금">0원</td><td data-l="배송료 제외 합계">약 200,900원</td></tr>
+</tbody>
+</table>
+<p class="muted small">관세청 과세환율 적용 기간: 2026.10.11~10.17. 미국 예시는 목록통관 가능한 일반 의류 기준이며, 위안화 예시는 1,000위안을 200.90원으로 원화 환산한 뒤 1,347.03원/달러로 한도를 판정했습니다. 실제 세액은 품목 분류, 운임, 신고 시점에 따라 달라집니다.</p>
+<p class="muted small">세목별 금액과 총세액은 원 단위로 각각 반올림하므로, 표시 금액의 합계에서 1원 차이가 날 수 있습니다.</p>
+<p><a class="next" href="{{ base }}">직구세 관세 계산기에서 다른 세일가 계산하기</a></p>
+
+<h2>미국발 특송은 200달러, 일반 소액면세는 150달러</h2>
+<p><strong>200달러 기준</strong>은 미국에서 특송화물로 들어오는 자가사용 물품 가운데 목록통관 대상인 경우의 특례입니다. 상품의 제조국이 미국이어야 한다는 뜻은 아닙니다. 관세청 FTA 포털은 미국발 특송화물의 200달러 기준을 안내하면서도, 목록통관 배제 물품에는 일반 150달러 기준이 적용된다고 구분합니다.</p>
+<p><strong>150달러 기준</strong>은 일반적인 자가사용 소액물품의 면세 한도입니다. 의약품·건강기능식품, 식품·주류·담배, 검역 대상 농축수산물, 일부 화장품처럼 목록통관에서 제외되는 품목은 미국발 특송이라도 200달러 특례로 판단하지 않습니다. 세부 품목은 <a href="https://www.law.go.kr/admRulLsInfoP.do?admRulId=36892&amp;efYd=0" rel="nofollow noopener" target="_blank">현행 특송물품 수입통관 고시 제9조·별표 1</a>와 <a href="https://www.customs.go.kr/kcs/cm/cntnts/cntntsView.do?cntntsId=819&amp;mi=2821" rel="nofollow noopener" target="_blank">관세청 특송물품 통관 안내</a>에서 확인하세요.</p>
+<p>면세 한도 판정에 쓰는 물품가격에는 상품가와 현지 배송료가 들어갑니다. 국제 운송료와 보험료가 따로 구분되는 경우에는 소액면세 물품가격에서 제외되지만, 과세 대상이 되면 국제 운송료도 과세가격에 포함될 수 있습니다. 주문 당시 결제 통화로 입력해 계산할 때는 <a href="{{ base }}guide/fx/">이번 주 관세청 과세환율</a>이 적용됩니다.</p>
+
+<h2>입항일이 같다는 이유만으로 합산되지는 않습니다</h2>
+<p>현행 「수입통관 사무처리에 관한 고시」 제68조는 각 물품의 가격 합계가 제67조의 면세 기준을 넘고, 정해진 분할 반입 조건에 해당할 때 합산과세하도록 합니다. 조건은 하나의 선하증권(B/L)이나 항공화물운송장(AWB)에 묶인 과세물품을 나눠 통관하는 경우, 또는 같은 해외공급자에게 같은 날짜에 산 과세물품을 면세 범위에 들도록 나눠 반입하는 경우입니다. 같은 날 입항했다는 사실만으로 합산하는 조항은 아닙니다.</p>
+<p>조문은 <a href="https://www.law.go.kr/admRulInfoP.do?admRulSeq=2100000269780" rel="nofollow noopener" target="_blank">법제처 국가법령정보센터의 수입통관 고시 제68조</a>에서 확인할 수 있습니다. 합산 판단은 각 주문의 판매처, 구매일, 운송장과 통관 경로를 기준으로 확인하세요.</p>
+
+<h2>시즌 통관 자료가 말하는 범위</h2>
+<p>관세청의 2024년 연말 특별 통관대책은 광군제·블랙프라이데이 시기 통관 물량이 평소보다 “40%가량 증가”한다고 밝혔습니다. 이는 시즌 물량에 관한 설명이며, 개별 물품의 통관이 며칠 늦어진다는 예측값은 아닙니다.</p>
+<p>관세청은 2025년에도 광군제와 블랙프라이데이처럼 할인이 집중되는 기간에 해외직구 불법 수입 특별단속을 실시한다고 공지했습니다. 해당 공지는 단속 계획을 설명하며 배송이나 통관 소요일을 제시하지 않습니다.</p>
+
+<h2>구매 전에 확인할 것</h2>
+<ul>
+<li>할인 적용 뒤 상품가와 현지 배송료를 확인하고, 통관 시점의 과세환율로 계산합니다.</li>
+<li>미국에서 특송으로 오는지, 해당 품목이 목록통관 대상인지 확인합니다. 품목이나 통관 경로가 다르면 200달러 특례 대신 150달러 기준이 적용될 수 있습니다.</li>
+<li>사업자 수입은 개인 자가사용 한도와 다른 신고·과세 계산이 필요하므로 <a href="{{ base }}business/">사업자용 수입 계산기</a>를 이용합니다.</li>
+</ul>
+<p>계산 결과는 예상치입니다. 실제 세액은 세관의 품목 분류와 과세가격 심사로 확정됩니다.</p>
+
+<h2>공식 원문</h2>
+<ul>
+<li><a href="https://www.law.go.kr/admRulLsInfoP.do?admRulId=36892&amp;efYd=0" rel="nofollow noopener" target="_blank">특송물품 수입통관 사무처리에 관한 고시 제9조·별표 1</a></li>
+<li><a href="https://www.law.go.kr/lsLinkProc.do?chrClsCd=010202&amp;datClsCd=010102&amp;gubun=admRul&amp;joNo=004500002&amp;lsId=36893&amp;lsNm=%EA%B4%80%EC%84%B8%EB%B2%95%EC%8B%9C%ED%96%89%EA%B7%9C%EC%B9%99&amp;mode=10" rel="nofollow noopener" target="_blank">관세법 시행규칙 제45조제2항제1호</a></li>
+<li><a href="https://www.customs.go.kr/ftaportalkor/cm/cntnts/cntntsView.do?cntntsId=997&amp;mi=3318" rel="nofollow noopener" target="_blank">관세청 FTA 포털: 특송 물품의 면세 기준 및 통관절차</a></li>
+<li><a href="https://www.customs.go.kr/kcs/cm/cntnts/cntntsView.do?cntntsId=819&amp;mi=2821" rel="nofollow noopener" target="_blank">관세청 특송물품 통관 안내 및 배제 품목</a></li>
+<li><a href="https://www.law.go.kr/admRulInfoP.do?admRulSeq=2100000269780" rel="nofollow noopener" target="_blank">수입통관 사무처리에 관한 고시 제68조</a></li>
+<li><a href="https://www.customs.go.kr/kcs/na/ntt/selectNttInfo.do?bbsId=1362&amp;mi=2891&amp;nttSn=10124175&amp;nttSnUrl=59be7d6dff5934a91a9147ebff4e8e08" rel="nofollow noopener" target="_blank">관세청 2024년 연말 극성수기 특별 통관대책</a></li>
+<li><a href="https://www.customs.go.kr/kcs/na/ntt/selectNttInfo.do?bbsId=1362&amp;mi=2891&amp;nttSn=10152443&amp;nttSnUrl=705793a2a6f86a52134b308900951188" rel="nofollow noopener" target="_blank">관세청 2025년 연말 해외직구 불법 수입 특별단속</a></li>
+</ul>
+</div>
+{% endblock %}
